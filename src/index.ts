@@ -4,6 +4,7 @@ import { addComment, archiveStory, deleteComment, evaluateStages, listComments, 
 import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
 import { getAlerts, refreshAlerts } from "./alerts";
+import { telegramWebhook } from "./telegram";
 export { ArticleRoom } from "./room";
 
 interface StoryRow {
@@ -147,6 +148,8 @@ export default {
       if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);
       // The newsroom's MCP server, for Claude agents
       if (url.pathname === "/mcp") return await mcp(req, env);
+      // The editor approves drafts from Telegram
+      if (url.pathname.startsWith("/telegram/")) return await telegramWebhook(req, env, url);
       const r = url.pathname.match(/^\/rooms\/([A-Za-z0-9_.~-]{1,200})\/ws$/);
       if (r) return await room(req, env, r[1]);
       return env.ASSETS.fetch(req);

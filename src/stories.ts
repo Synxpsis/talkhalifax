@@ -1,4 +1,5 @@
 import { Env, User, json, randomId } from "./env";
+import { approvalOn, sendDraft } from "./telegram";
 
 // ---------- When a developing story moves down to Articles ----------
 // All of these must hold, or it has been developing longer than MAX_DEVELOPING.
@@ -90,14 +91,18 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
   if (!existing) {
     if (opts.mode === "update") throw new NewsroomError(`No story with id ${id}. Use publish_story to create it.`);
     for (const need of ["kind", "headline", "source_url", "published_at"]) if (cols[need] == null) throw new NewsroomError(`New stories need ${need === "source_url" ? "source" : need === "published_at" ? "publishedAt" : need}.`);
-    const stage = opts.review && cols.kind !== "skip" ? "draft" : "developing";
+    // Once the editor's Telegram is set up, every new article waits for approval; notices still publish at once
+    const held = opts.review || (cols.kind === "article" && approvalOn(env));
+    const stage = held && cols.kind !== "skip" ? "draft" : "developing";
     const names = Object.keys(cols);
     await env.DB.prepare(
       `INSERT INTO stories (id, ${names.join(", ")}, stage, developing_since, last_newsroom_update, update_note, version, updated_at)
        VALUES (?, ${names.map(() => "?").join(", ")}, ?, ?, ?, '', 1, ?)`,
     ).bind(id, ...names.map(n => cols[n]), stage, now, now, now).run();
     await snapshot(env, id, 1, note || (stage === "draft" ? "Drafted for review" : "Published"), author);
-    return { id, version: 1, created: true, stage };
+    if (stage !== "draft") return { id, version: 1, created: true, stage };
+    return { id, version: 1, created: true, stage, telegram: await sendDraft(env, id),
+      next: "Waiting for the editor's approval. Call await_review with this id until it's approved or discarded." };
   }
 
   if (opts.mode === "create") throw new NewsroomError(`A story with id ${id} already exists (stage: ${existing.stage}). Use update_story to change it.`);

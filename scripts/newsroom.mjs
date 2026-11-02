@@ -11,6 +11,9 @@
 //   node scripts/newsroom.mjs tool <name> [json | @file.json]
 //       Calls one newsroom MCP tool (scan_sources, read_release, get_guidelines, list_leads, claim_lead, publish_story,
 //       update_story, …) and prints its result. For agents that can't connect to /mcp directly. `tool list` names them.
+//   node scripts/newsroom.mjs wait-review <id>
+//       Waits (up to 9 minutes per run) for the editor to approve or discard a draft on Telegram, then prints
+//       approved, discarded, expired, or waiting (run it again).
 //
 // Site: TALKHALIFAX_URL (default https://talkhalifax.alexwmmolloy.workers.dev)
 // Token: TALKHALIFAX_TOKEN, or the .newsroom-token file at the project root.
@@ -83,6 +86,19 @@ async function tool() {
   if (res.isError) process.exitCode = 1;
 }
 
-const run = { list, publish, tool }[cmd];
-if (!run) { console.error("usage: node scripts/newsroom.mjs list | publish <file.json> [id] | tool <name> [json | @file.json]"); process.exit(2); }
+async function waitReview() {
+  const id = file;
+  if (!id) throw new Error("usage: wait-review <id>");
+  const stop = Date.now() + 9 * 60_000; // inside a 10-minute shell timeout
+  for (;;) {
+    const res = await rpc("tools/call", { name: "await_review", arguments: { id, wait: 90 } });
+    const text = res.content.map(c => c.text).join("\n");
+    if (res.isError) { console.log(text); process.exitCode = 1; return; }
+    const { decision } = JSON.parse(text);
+    if (decision !== "waiting" || Date.now() >= stop) { console.log(text); return; }
+  }
+}
+
+const run = { list, publish, tool, "wait-review": waitReview }[cmd];
+if (!run) { console.error("usage: node scripts/newsroom.mjs list | publish <file.json> [id] | tool <name> [json | @file.json] | wait-review <id>"); process.exit(2); }
 run().catch(e => { console.error(e.message); process.exit(1); });

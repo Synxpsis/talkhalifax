@@ -9,6 +9,14 @@ New articles start under Developing, with a live chat, and move to Articles on t
 Use `review: true` on `publish_story` for anything sensitive (police matters, health, people named in an incident):
 the story waits as a draft until a moderator approves it.
 
+Every new `article` also waits for the editor's approval: `publish_story` returns `stage: "draft"`, and the editor
+gets it on Telegram with Approve and Discard buttons. (Notices, skips and `update_story` changes publish at once.)
+Keep the lead claimed and stay in your run until the editor decides: call `await_review` with the story id (from a
+terminal, `node scripts/newsroom.mjs wait-review <id>`) and call it again while it answers `waiting`. Then close the lead:
+`approved` → `complete_lead` as published; `discarded` → dropped, with notes "Discarded by the editor";
+`expired` (no answer after 50 minutes) → published, with notes "Awaiting the editor's approval on Telegram". Don't
+re-publish or change a draft while you wait.
+
 ## Which kind of document
 
 Decide one `kind` per release:

@@ -9,6 +9,10 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   /** Bearer token the newsroom (Claude) uses to publish and update stories. A secret. */
   NEWSROOM_TOKEN?: string;
+  /** Telegram bot (@BotFather) that sends the editor new drafts to approve. A secret. */
+  TELEGRAM_BOT_TOKEN?: string;
+  /** The editor's Telegram chat id; the bot replies with it on /start. With the token set, new articles need approval. */
+  TELEGRAM_CHAT_ID?: string;
   /** "1" enables the localhost-only dev sign-in. Set in .dev.vars, never in production. */
   DEV_LOGIN?: string;
 }
