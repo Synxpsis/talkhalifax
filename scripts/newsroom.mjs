@@ -8,6 +8,9 @@
 //       status, supersededBy, readMin, reason, source, publishedAt, area, section), plus optional
 //       "note" (what changed, shown to readers on updates) and "reopen" (true brings an Article back to Developing).
 //       For an update, include only the fields that change.
+//   node scripts/newsroom.mjs tool <name> [json | @file.json]
+//       Calls one newsroom MCP tool (scan_sources, read_release, get_guidelines, list_leads, claim_lead, publish_story,
+//       update_story, …) and prints its result. For agents that can't connect to /mcp directly. `tool list` names them.
 //
 // Site: TALKHALIFAX_URL (default https://talkhalifax.alexwmmolloy.workers.dev)
 // Token: TALKHALIFAX_TOKEN, or the .newsroom-token file at the project root.
@@ -56,6 +59,30 @@ async function publish() {
   console.log(`${out.created ? "created" : "updated"} ${id} v${out.version}${out.reopened ? " (back to Developing)" : ""}`);
 }
 
-const run = { list, publish }[cmd];
-if (!run) { console.error("usage: node scripts/newsroom.mjs list | publish <file.json> [id]"); process.exit(2); }
+async function rpc(method, params) {
+  const r = await fetch(`${BASE}/mcp`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token()}`, "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok || out.error) throw new Error(`${method} failed: ${r.status} ${out.error?.message || ""}`);
+  return out.result;
+}
+
+async function tool() {
+  const name = file;
+  if (!name) throw new Error("usage: tool <name> [json | @file.json]");
+  if (name === "list") {
+    for (const t of (await rpc("tools/list", {})).tools) console.log(`${t.name}\t${t.description}`);
+    return;
+  }
+  const raw = idArg?.startsWith("@") ? readFileSync(idArg.slice(1), "utf8") : idArg || "{}";
+  const res = await rpc("tools/call", { name, arguments: JSON.parse(raw) });
+  console.log(res.content.map(c => c.text).join("\n"));
+  if (res.isError) process.exitCode = 1;
+}
+
+const run = { list, publish, tool }[cmd];
+if (!run) { console.error("usage: node scripts/newsroom.mjs list | publish <file.json> [id] | tool <name> [json | @file.json]"); process.exit(2); }
 run().catch(e => { console.error(e.message); process.exit(1); });

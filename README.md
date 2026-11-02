@@ -38,8 +38,12 @@ Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc
 
 ## Publishing stories
 
-`node scripts/newsroom.mjs list` shows every story; `node scripts/newsroom.mjs publish <file.json> [id]` creates or updates one. The scheduled refresh task uses these to turn new halifax.ca releases into stories, following `prototype/article_guidelines.md`.
+Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work through the newsroom MCP server at `/mcp` (Bearer `NEWSROOM_TOKEN`). From a terminal, `node scripts/newsroom.mjs list` and `publish <file.json> [id]` do the same, and `tool <name> [json | @file.json]` calls any MCP tool (`tool list` names them).
+
+**The journalist** is a Claude Code cloud routine, "TalkHalifax journalist", that runs at five past every hour on the Claude plan (no Anthropic API key). It clones this repo and uses `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. Each run files the last 3 days' new halifax.ca releases as leads, then works up to 5 open leads and records its versions as `cloud-routine`. Its prompt and schedule live at claude.ai/code/routines. It needs, in its cloud environment:
+- an environment variable `TALKHALIFAX_TOKEN` set to the newsroom token
+- network access to `talkhalifax.alexwmmolloy.workers.dev`
 
 ## Not built yet
 
-Claude journalists running in Cloudflare itself (Phase 1; today the refresh task runs on a PC), scheduled check-ins on developing stories (Phase 2), more sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
+Scheduled check-ins on developing stories (Phase 2), more sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
