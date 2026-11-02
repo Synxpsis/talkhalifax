@@ -24,7 +24,7 @@
 
   // ---------- State ----------
   const S = {
-    me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, allAlerts: false, offline: false,
+    me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, offline: false,
     sort: "active", current: "home", article: null,
   };
   const room = { ws: null, id: null, messages: [], profiles: {}, here: [], readers: 0, you: null, error: "", typing: false, armed: null, armedTimer: null, tries: 0, closing: false };
@@ -48,16 +48,17 @@
 
   // ---------- Home ----------
   function renderToday() {
-    const w = S.weather;
-    const bits = [`<span><b>${esc(fmt({ weekday: "long", month: "long", day: "numeric" }).format(new Date()))}</b></span>`];
-    if (w) {
-      const c = w.current || {};
-      if (c.tempC != null) bits.push(`<span><b>${Math.round(c.tempC)}°C</b> ${esc((c.condition || "").toLowerCase())}</span>`);
-      if (w.sunrise && w.sunset) bits.push(`<span>Sun <b>${hm(w.sunrise)}</b>–<b>${hm(w.sunset)}</b></span>`);
-      const hi = (w.tides || []).find(t => t.kind === "high" && new Date(t.at) > Date.now());
-      if (hi) bits.push(`<span>High tide <b>${hm(hi.at)}</b></span>`);
-    }
-    $("#todayLine").innerHTML = bits.join("");
+    const w = S.weather, c = (w && w.current) || {};
+    const hi = w && (w.tides || []).find(t => t.kind === "high" && new Date(t.at) > Date.now());
+    const dash = w ? "–" : "…"; // "…" while loading, "–" when the source has no figure
+    const cond = c.condition ? c.condition[0].toUpperCase() + c.condition.slice(1).toLowerCase() : "";
+    const cell = (k, v, s = "") => `<div><span class="td-k">${k}</span><span class="td-v">${v}</span>${s ? `<span class="td-s">${esc(s)}</span>` : ""}</div>`;
+    $("#todayLine").innerHTML =
+      `<div class="td-date"><span class="td-k">${esc(fmt({ weekday: "long" }).format(new Date()))}</span><b>${esc(fmt({ month: "long", day: "numeric" }).format(new Date()))}</b></div>`
+      + cell("Weather", c.tempC != null ? `${Math.round(c.tempC)}°C` : dash, cond)
+      + cell("Sunrise", w && w.sunrise ? hm(w.sunrise) : dash)
+      + cell("Sunset", w && w.sunset ? hm(w.sunset) : dash)
+      + cell("High tide", hi ? hm(hi.at) : dash, hi && hi.m != null ? `${hi.m} m` : "");
   }
 
   /** Banners pinned under the header on Home: weather warnings, then city notices, then watches and statements. */
@@ -90,27 +91,9 @@
     if (more) more.onclick = () => { S.allBanners = !S.allBanners; renderBanners(); };
   }
 
-  /** Getting around: official road and transit notices, linked to their source. Weather warnings are in the banners. */
-  const ALERT_ORDER = { Roads: 1, "Windsor Street Exchange": 2, Transit: 3 };
-  function renderAlerts() {
-    renderBanners();
-    const el = $("#alerts");
-    if (!S.alerts) { el.innerHTML = `<div class="msg">${S.offline ? "Road and transit notices aren't available right now." : "Loading…"}</div>`; return; }
-    const items = S.alerts.items.filter(a => a.cat !== "Weather").sort((a, b) => (ALERT_ORDER[a.cat] - ALERT_ORDER[b.cat]) || String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
-    if (!items.length) { el.innerHTML = '<div class="msg">No road or transit notices right now.</div>'; return; }
-    const shown = S.allAlerts ? items : items.slice(0, 6);
-    el.innerHTML = `<ul class="alerts">${shown.map(a => `<li>
-        <span class="ac">${esc(a.cat === "Windsor Street Exchange" ? "Windsor St. Exch." : a.cat)} · ${esc(a.kind)}</span>
-        <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
-        ${a.detail || a.until ? `<span class="ad">${a.until ? `Until ${esc(a.until)}. ` : ""}${esc(a.detail)}</span>` : ""}
-      </li>`).join("")}</ul>` + (items.length > shown.length ? `<button type="button" class="alerts-more" id="alertsMore">Show all ${items.length}</button>` : "");
-    const more = $("#alertsMore");
-    if (more) more.onclick = () => { S.allAlerts = true; renderAlerts(); };
-  }
-
   function renderHome() {
     renderToday();
-    renderAlerts();
+    renderBanners();
     document.querySelectorAll(".sort").forEach(b => b.setAttribute("aria-pressed", b.dataset.sort === S.sort));
     if (!S.stories) {
       const m = `<div class="msg">${S.offline ? "TalkHalifax can't reach its server right now. Check your connection and reload." : "Loading…"}</div>`;
@@ -794,7 +777,7 @@
   }
   async function loadAlerts() {
     try { S.alerts = (await getJSON("/api/alerts")).alerts || { items: [] }; } catch (e) {}
-    if (S.current === "home") renderAlerts();
+    if (S.current === "home") renderBanners();
   }
   async function loadMe() {
     try { const d = await getJSON("/api/me"); S.me = d.user; S.providers = d.providers; } catch (e) {}

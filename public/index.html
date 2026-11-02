@@ -111,8 +111,20 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 .more:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Home: today line + discussion list */
-.today-line { display: flex; flex-wrap: wrap; gap: 4px 18px; font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); padding-bottom: 14px; margin-bottom: 22px; border-bottom: 1px solid var(--line); width: 100%; box-sizing: border-box; }
-.today-line b { color: var(--ink); font-weight: 500; }
+/* Today card: the date, then weather, sunrise, sunset and high tide as labelled cells */
+.today { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); margin-bottom: 28px; border-radius: var(--radius-l); overflow: hidden; }
+.today > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 14px 18px; }
+.today > div + div { border-left: 1px solid var(--line); }
+.today .td-k { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.today .td-date b { font-family: var(--f-display); font-weight: 800; font-size: 26px; line-height: 1; text-transform: uppercase; letter-spacing: .01em; }
+.today .td-v { font-family: var(--f-mono); font-size: 16px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.today .td-s { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) {
+  .today { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today .td-date { grid-column: 1 / -1; }
+  .today > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .today > div:nth-child(odd):not(.td-date) { border-left: 1px solid var(--line); }
+}
 .forum-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
 .forum-top h1 { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; text-transform: uppercase; margin: 0; }
 .sorts { display: flex; gap: 16px; }
@@ -166,15 +178,6 @@ header .abar-row { display: flex; flex-wrap: nowrap; align-items: center; justif
 .ptr.busy .spin { display: block; color: var(--accent); animation: ptr-spin .8s linear infinite; }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ptr { transition: opacity .2s ease; } .ptr.busy .spin { animation: none; } }
-.alerts { list-style: none; margin: 0; padding: 0; }
-.alerts li { display: grid; grid-template-columns: 10.5em 1fr; gap: 2px 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
-.alerts .ac { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
-.alerts a { font-size: 15px; font-weight: 500; color: var(--ink); text-decoration: none; }
-.alerts a:hover { text-decoration: underline; }
-.alerts .ad { grid-column: 2; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
-.alerts-more { all: unset; cursor: pointer; margin-top: 10px; font-size: 13.5px; color: var(--accent); }
-.alerts-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-@media (max-width: 560px) { .alerts li { grid-template-columns: 1fr; } .alerts .ad { grid-column: 1; } }
 .forum-foot { margin-top: 18px; font-size: 13px; color: var(--muted); }
 
 /* Status lists */
@@ -433,18 +436,12 @@ img { max-width: 100%; }
 
 <main>
   <section class="view wrap" id="home">
-    <div class="today-line" id="todayLine"><span>Loading today's weather…</span></div>
+    <section class="today glass" id="todayLine" aria-label="Today in Halifax"></section>
     <div class="forum-top">
       <h1 class="live-h">Developing</h1>
     </div>
     <p class="forum-lede">Stories the newsroom is still following. Claude updates them as news comes in, and each one has a live chat.</p>
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>
-
-    <div class="forum-top section-gap">
-      <h2 class="sect-title">Getting around</h2>
-    </div>
-    <p class="forum-lede">Road work and transit detours, as the city posts them.</p>
-    <div id="alerts"><div class="msg">Loading…</div></div>
 
     <div class="forum-top section-gap">
       <h2 class="sect-title">Articles</h2>
