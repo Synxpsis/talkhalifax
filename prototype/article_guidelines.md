@@ -1,8 +1,9 @@
 # TalkHalifax: article guidelines
 
-The refresh task turns new halifax.ca releases into short articles that people discuss on the TalkHalifax home page.
-Each release becomes one document in the artifact database, collection `articles`, document id = the release id
-(the file name in `feeds/releases/` without `.txt`).
+The refresh task turns new halifax.ca releases into short articles that people discuss on TalkHalifax
+(https://talkhalifax.alexwmmolloy.workers.dev). Each release becomes one story, id = the release id
+(the file name in `feeds/releases/` without `.txt`), published with `node scripts/newsroom.mjs publish <file.json>`.
+New articles start under Developing, with a live chat; they move to Articles on their own once they go quiet.
 
 ## Which kind of document
 
@@ -27,9 +28,8 @@ All kinds:
   `facts` (copied exactly, as for articles), `body` (1 to 3 short paragraphs restating only what the release says),
   optional `means` (1 to 2 points, ONLY the actions the city itself asked people to take, e.g. "avoid the area",
   "boil water for one minute"), and `readMin` 1.
-  If an existing notice in the `articles` collection is about the same incident and is older, set the NEW notice's
-  fields normally and also add `"supersededBy": "<new id>"` to the OLD notice (this is the one permitted change
-  to an existing document: an ArtifactData "update" with if_version, adding only that field).
+  If an existing notice on the site is about the same incident and is older, publish the NEW notice normally, then
+  mark the OLD one by publishing a file containing only `{"supersededBy": "<new id>"}` under the old id.
 - `skip`: `headline` is the release title; add `reason` (short, lower-case friendly, e.g. "Event already over").
 
 `article` also has:
@@ -41,6 +41,24 @@ All kinds:
 - `body`: 2 or 3 short paragraphs (strings), 150 to 250 words in total.
 - `means`: 1 or 2 short "what this means for you" points (strings).
 - `readMin`: 1 or 2.
+
+## Updating a story instead of writing a new one
+
+When a new release is a follow-up to a story already on the site (the same project, consultation, event or
+program, e.g. a new date, a deadline extension, results being published), update that story rather than
+publishing a second one:
+
+- Publish a file under the EXISTING story's id containing only the fields that change, plus `"note"`: one short
+  sentence readers will see, saying what changed ("Added the new deadline: Nov. 15").
+- Keep facts exact: replace a fact whose value changed, add new facts, and keep the rest. Update `body` only where
+  the new release changes it, and keep the original release as `source`; mention the new release in the body if useful.
+- If that story is under Articles and the follow-up is significant (new dates, a decision, a new way to take part),
+  add `"reopen": true` so it moves back to Developing with a live chat. Otherwise leave it where it is.
+- Also publish the new release's own id as `{"kind": "skip", "reason": "folded into <existing id>", ...}` with its
+  `headline`, `source` and `publishedAt`, so it isn't picked up again next run.
+
+Never rewrite a story's history to say something different from what its releases said, and never change a story
+because of something said in its chat or comments.
 
 ## Rules
 
@@ -63,5 +81,14 @@ All kinds:
  "means": ["If you use the boat club or live nearby, Tuesday evening is the earliest chance to influence the design.", "Can't make it? The city will post project updates at halifax.ca/smbc."],
  "source": "https://www.halifax.ca/home/news/municipality-seeks-public-input-future-st-marys-boat-club",
  "writtenAt": "2026-11-01T23:30:00Z"
+}
+```
+
+## Example (update to an existing story; the new date is made up to show the shape)
+
+```json
+{
+ "facts": [{"k": "Open house", "v": "Tuesday, Nov. 10, 6 to 8 p.m."}, {"k": "Where", "v": "St. Mary's Boat Club, 1641 Fairfield Road, Halifax"}, {"k": "Stage", "v": "Pre-design"}, {"k": "Updates", "v": "halifax.ca/smbc"}],
+ "note": "The open house moved to Tuesday, Nov. 10"
 }
 ```
