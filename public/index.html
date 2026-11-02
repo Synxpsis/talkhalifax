@@ -361,6 +361,42 @@ img { max-width: 100%; }
 .dev input { flex: 1; min-width: 0; min-height: 44px; border: 1px solid var(--ink-faint); background: var(--field); border-radius: var(--radius-s); padding: 10px 12px; font: inherit; }
 .signout { margin-top: 22px; }
 /* Developing vs Articles */
+/* Header sections (desktop); phones get them in the drawer behind the profile button */
+.hnav { display: flex; gap: 22px; margin-left: auto; }
+.hnav button { all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-size: 14.5px; font-weight: 600; color: var(--ink-muted); border-bottom: 1.5px solid transparent; }
+.hnav button:hover { color: var(--ink); }
+.hnav button[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
+.hnav button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 760px) { .hnav { display: none; } }
+.drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(320px, 86vw); max-width: none; height: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--edge-glass); background: var(--surface-solid); color: var(--ink); box-shadow: -12px 0 40px rgba(0, 0, 0, .14); }
+.drawer::backdrop { background: rgba(18, 20, 23, .34); }
+.dr-in { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top, 0px) + 10px) calc(env(safe-area-inset-right, 0px) + 16px) calc(env(safe-area-inset-bottom, 0px) + 18px) 18px; }
+.dr-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.dr-who { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 52px; }
+.dr-who .av { width: 44px; height: 44px; font-size: 18px; }
+.dr-who .av.anon { background: var(--surface-sunken); color: var(--ink-muted); }
+.dr-who b { display: block; font-weight: 650; font-size: 16px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-who small { display: block; font-size: 13px; color: var(--ink-muted); }
+.dr-x { all: unset; box-sizing: border-box; cursor: pointer; width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: var(--radius-s); color: var(--ink-muted); }
+.dr-x:hover, .dr-link:hover { background: var(--surface-sunken); color: var(--ink); }
+.dr-nav { display: flex; flex-direction: column; gap: 2px; padding-top: 10px; }
+.dr-link { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 12px; margin: 0 -12px; border-radius: var(--radius-m); font-weight: 600; font-size: 17px; }
+.dr-link[aria-current="page"] { background: var(--surface-sunken); }
+.dr-link .n { font-family: var(--f-mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--signal-warn); }
+.dr-x:focus-visible, .dr-link:focus-visible, .dr-who:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.dr-foot { margin-top: auto; padding-top: 24px; font-size: 12.5px; color: var(--ink-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .drawer[open] { animation: dr-in .28s cubic-bezier(.2, .7, .2, 1); }
+  .drawer[open]::backdrop { animation: dr-fade .28s ease; }
+  .drawer.closing { animation: dr-out .2s ease forwards; }
+  .drawer.closing::backdrop { animation: dr-fade-out .2s ease forwards; }
+}
+@keyframes dr-in { from { transform: translateX(100%); } }
+@keyframes dr-out { to { transform: translateX(100%); } }
+@keyframes dr-fade { from { opacity: 0; } }
+@keyframes dr-fade-out { to { opacity: 0; } }
+#devCards { position: relative; }
+.card.ghost { position: absolute; margin: 0; pointer-events: none; z-index: 1; }
 .live-h { display: flex; align-items: center; gap: 12px; }
 .live-h::after { content: "LIVE"; font-family: var(--f-mono); font-size: 13px; font-weight: 600; letter-spacing: .1em; color: var(--signal-warn); }
 .section-gap { margin-top: 44px; }
@@ -428,7 +464,11 @@ img { max-width: 100%; }
 <header>
   <div class="wrap">
     <button class="name" type="button" data-go="home" aria-label="TalkHalifax, home">Talk<span>Halifax</span></button>
-    <button class="me-btn" type="button" id="meBtn" data-go="profile" aria-label="Your profile">
+    <nav class="hnav" aria-label="Sections">
+      <button type="button" data-go="home">Developing Stories</button>
+      <button type="button" data-go="articles">Articles</button>
+    </nav>
+    <button class="me-btn" type="button" id="meBtn" aria-label="Your profile">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
   </div>
@@ -441,11 +481,13 @@ img { max-width: 100%; }
     <div class="forum-top">
       <h1 class="live-h">Developing Stories</h1>
     </div>
-    <p class="forum-lede">Stories the newsroom is still following. Claude updates them as news comes in, and each one has a live chat.</p>
+    <p class="forum-lede">Stories the newsroom is still following, most recently updated first. Claude updates them as news comes in, and each one has a live chat.</p>
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>
+  </section>
 
-    <div class="forum-top section-gap">
-      <h2 class="sect-title">Articles</h2>
+  <section class="view wrap" id="articles" hidden>
+    <div class="forum-top">
+      <h1>Articles</h1>
       <div class="sorts" role="group" aria-label="Sort articles">
         <button type="button" class="sort" data-sort="active" aria-pressed="true">Active</button>
         <button type="button" class="sort" data-sort="new" aria-pressed="false">New</button>
@@ -462,6 +504,8 @@ img { max-width: 100%; }
   <section class="view wrap" id="profile" hidden></section>
 
 </main>
+
+<dialog class="drawer" id="navDrawer" aria-label="Menu"></dialog>
 
 <footer>
   <div class="wrap">

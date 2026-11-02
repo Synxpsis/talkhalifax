@@ -89,22 +89,44 @@
     if (more) more.onclick = () => { S.allBanners = !S.allBanners; renderBanners(); };
   }
 
+  const tms = x => (x ? new Date(x).getTime() : 0);
+  const loadingMsg = () => `<div class="msg">${S.offline ? "TalkHalifax can't reach its server right now. Check your connection and reload." : "Loading…"}</div>`;
+  const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /** Swap in new cards, sliding the ones that moved, fading in new stories and fading out ones that left (moved to Articles). */
+  function setCards(box, html) {
+    if (box.dataset.html === html) return;
+    const old = new Map();
+    const animate = !reducedMotion() && box.offsetParent && typeof box.animate === "function";
+    if (animate) box.querySelectorAll(".card[data-article]").forEach(el => old.set(el.dataset.article, { el, r: el.getBoundingClientRect() }));
+    const boxR = box.getBoundingClientRect();
+    box.innerHTML = html; box.dataset.html = html;
+    if (!animate || !old.size) return;
+    const seen = new Set();
+    box.querySelectorAll(".card[data-article]").forEach(el => {
+      const id = el.dataset.article, was = old.get(id), now = el.getBoundingClientRect();
+      seen.add(id);
+      if (!was) return el.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: "ease-out" });
+      const dx = was.r.left - now.left, dy = was.r.top - now.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 520, easing: "cubic-bezier(.2, .7, .2, 1)" });
+    });
+    for (const [id, { el, r }] of old) {
+      if (seen.has(id)) continue;
+      el.classList.add("ghost"); el.removeAttribute("data-article"); el.setAttribute("aria-hidden", "true"); el.tabIndex = -1;
+      Object.assign(el.style, { left: r.left - boxR.left + "px", top: r.top - boxR.top + "px", width: r.width + "px", height: r.height + "px" });
+      box.appendChild(el);
+      el.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.96)" }], { duration: 360, easing: "ease-in", fill: "forwards" }).onfinish = () => el.remove();
+    }
+  }
+
+  /** Home is the developing stories, the most recently updated first. */
   function renderHome() {
     renderToday();
-    renderBanners();
-    document.querySelectorAll(".sort").forEach(b => b.setAttribute("aria-pressed", b.dataset.sort === S.sort));
-    if (!S.stories) {
-      const m = `<div class="msg">${S.offline ? "TalkHalifax can't reach its server right now. Check your connection and reload." : "Loading…"}</div>`;
-      $("#devCards").innerHTML = m; $("#artCards").innerHTML = m;
-      return;
-    }
-    const t = x => (x ? new Date(x).getTime() : 0);
-
     renderBanners(); // city notices live in the banners now
-    // ---- Developing: live stories by latest activity ----
-    const dev = S.stories.filter(x => x.kind === "article" && x.stage === "developing")
-      .sort((a, b) => Math.max(t(b.lastUpdate), b.room.lastAt || 0, b.room.here ? Date.now() : 0, t(b.developingSince))
-                    - Math.max(t(a.lastUpdate), a.room.lastAt || 0, a.room.here ? Date.now() : 0, t(a.developingSince)));
+    if (!S.stories) { setCards($("#devCards"), loadingMsg()); return; }
+    const t = tms;
+    const updated = x => Math.max(t(x.lastUpdate), t(x.developingSince), t(x.publishedAt));
+    const dev = S.stories.filter(x => x.kind === "article" && x.stage === "developing").sort((a, b) => updated(b) - updated(a));
     const devCards = dev.map((x, i) => {
       const r = x.room;
       const recentUpdate = x.lastUpdate && Date.now() - t(x.lastUpdate) < 864e5;
@@ -119,9 +141,14 @@
         ${x.dek ? `<span class="dk">${esc(x.dek)}</span>` : ""}
         <span class="ft">${left}<span class="pill${r.messages || r.here ? "" : " zero"}">${right}</span></span></button>`;
     }).join("");
-    $("#devCards").innerHTML = devCards || '<div class="msg">Nothing developing right now. New stories appear here as the newsroom publishes them.</div>';
+    setCards($("#devCards"), devCards || '<div class="msg">Nothing developing right now. New stories appear here as the newsroom publishes them, and settled ones are in <a href="#articles" data-go="articles">Articles</a>.</div>');
+  }
 
-    // ---- Articles: settled stories with threaded comments ----
+  /** Articles: settled stories with threaded comments. */
+  function renderArticles() {
+    document.querySelectorAll("[data-sort]").forEach(b => b.setAttribute("aria-pressed", b.dataset.sort === S.sort));
+    if (!S.stories) { $("#artCards").innerHTML = loadingMsg(); return; }
+    const t = tms;
     const key = {
       active: x => -Math.max(x.comments.lastAt || 0, t(x.archivedAt)),
       new: x => -t(x.publishedAt),
@@ -137,7 +164,7 @@
         <span class="ft"><span>${c.lastAt ? "Last comment " + ago(c.lastAt) : shortDate(x.publishedAt)}</span><span class="pill${c.count ? "" : " zero"}">${c.count} ${c.count === 1 ? "comment" : "comments"}</span></span></button>`;
     }).join("") || '<div class="msg">No articles yet. Developing stories move here once they settle.</div>';
   }
-  document.querySelectorAll(".sort").forEach(b => b.addEventListener("click", () => { S.sort = b.dataset.sort; renderHome(); }));
+  document.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { S.sort = b.dataset.sort; renderArticles(); }));
 
   // ---------- Article room ----------
   const narrow = () => window.matchMedia("(max-width: 960px)").matches;
@@ -164,7 +191,10 @@
   }
   window.addEventListener("resize", applyChatState);
 
-  const BACK = `<button type="button" class="back" data-go="home">← All stories</button>`;
+  /** Back to the list the story lives in: Articles for settled ones, Developing Stories for the rest. */
+  const back = a => a && a.kind === "article" && a.stage === "archived"
+    ? `<button type="button" class="back" data-go="articles">← Articles</button>`
+    : `<button type="button" class="back" data-go="home">← Developing Stories</button>`;
 
   /** The article itself (shared by Developing and Articles views, and swapped in place on live updates). */
   function articleHTML(a) {
@@ -205,14 +235,14 @@
     v.classList.remove("wide");
     let a = S.full[id];
     if (!a) {
-      v.innerHTML = `${BACK}<div class="msg" style="margin-top:20px">Loading…</div>`;
+      v.innerHTML = `${back()}<div class="msg" style="margin-top:20px">Loading…</div>`;
       try { a = await fetchStory(id); }
-      catch (e) { if (S.article === id) v.innerHTML = `${BACK}<div class="msg" style="margin-top:20px">This story isn't available.</div>`; return; }
+      catch (e) { if (S.article === id) v.innerHTML = `${back()}<div class="msg" style="margin-top:20px">This story isn't available.</div>`; return; }
       if (S.article !== id) return;
     }
 
     if (a.kind === "skip") {
-      v.innerHTML = `${BACK}
+      v.innerHTML = `${back()}
         <article>
           <div class="kicker">${esc(a.section)}</div>
           <h1>${esc(a.headline)}</h1>
@@ -224,14 +254,14 @@
     }
 
     if (a.kind === "notice") {
-      v.innerHTML = `<div class="room"><div>${BACK}${articleHTML(a)}<p class="closed">Chat and comments are off for city notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p></div></div>`;
+      v.innerHTML = `<div class="room"><div>${back()}${articleHTML(a)}<p class="closed">Chat and comments are off for city notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p></div></div>`;
       wireStageTools(); window.scrollTo({ top: 0 }); return;
     }
 
     // ---- Articles: no live chat; threaded comments below ----
     if (a.stage !== "developing") {
       leaveRoom();
-      v.innerHTML = `<div class="room"><div id="articleCol">${BACK}${articleHTML(a)}</div></div>
+      v.innerHTML = `<div class="room"><div id="articleCol">${back(a)}${articleHTML(a)}</div></div>
         <section class="comments-sec" aria-labelledby="cmH">
           <div class="c-head2"><h2 id="cmH">Comments</h2><span id="cmCount"></span></div>
           <div id="cmCompose"></div>
@@ -246,7 +276,7 @@
     // ---- Developing: article plus the docked live chat ----
     v.classList.add("wide");
     v.innerHTML = `<div class="room">
-      <div id="articleCol">${BACK}${articleHTML(a)}</div>
+      <div id="articleCol">${back(a)}${articleHTML(a)}</div>
       <aside class="chat glass" id="chat" aria-label="Live chat about this story">
         <div class="chat-head" id="chatHead">
           <span class="grab" aria-hidden="true"></span>
@@ -278,7 +308,7 @@
     try { a = await fetchStory(id); } catch (e) { return; }
     const col = $("#articleCol");
     if (S.current !== "article" || S.article !== id || !col) return;
-    col.innerHTML = BACK + articleHTML(a);
+    col.innerHTML = back(a) + articleHTML(a);
     wireStageTools();
     const art = col.querySelector("article");
     if (art) { art.classList.remove("flash-update"); void art.offsetWidth; art.classList.add("flash-update"); }
@@ -581,11 +611,11 @@
 
   async function renderProfile() {
     const v = $("#profile");
-    const back = BACK;
+    const backBtn = back();
     if (!S.me) {
       const p = S.providers;
       const creating = authMode === "signup";
-      v.innerHTML = `<div class="profile">${back}
+      v.innerHTML = `<div class="profile">${backBtn}
         <div class="profile-card glass"><div class="pic">${PERSON_SVG}</div>
           <div><h1>${creating ? "Join TalkHalifax" : "Welcome back"}</h1><p>${creating ? "Pick a username to chat about the city's news. No email needed." : "Sign in to join the live chats."}</p></div></div>
         <div class="auth-tabs" role="tablist" aria-label="Sign in or create an account">
@@ -630,7 +660,7 @@
       if (f) f.addEventListener("submit", e => { e.preventDefault(); location.href = `/auth/dev?name=${encodeURIComponent($("#devName").value)}&return=${encodeURIComponent("/#profile")}`; });
       return;
     }
-    v.innerHTML = `<div class="profile">${back}
+    v.innerHTML = `<div class="profile">${backBtn}
       <div class="profile-card glass">
         <div class="pic">${S.me.avatarUrl ? `<img alt="" src="${esc(S.me.avatarUrl)}" referrerpolicy="no-referrer">` : avatar({ id: S.me.id, name: S.me.name }, "av").replace('class="av"', 'class="av" style="width:100%;height:100%;font-size:32px;background:' + hue(S.me.id) + '"')}</div>
         <div><h1 id="pName"></h1><p>Halifax${S.me.role === "moderator" ? '<span class="role">Moderator</span>' : ""}</p></div>
@@ -666,28 +696,68 @@
     } catch (e) { $("#pActivity").innerHTML = `<li class="msg" style="border:0">Couldn't load your messages.</li>`; }
   }
 
-  // ---------- Navigation: Home, a profile, or one article room ----------
+  // ---------- Drawer (phones): the profile button opens the sections ----------
+  const phone = () => window.matchMedia("(max-width: 760px)").matches;
+  const drawer = $("#navDrawer");
+  function renderDrawer() {
+    const live = (S.stories || []).filter(x => x.kind === "article" && x.stage === "developing").length;
+    const here = v => S.current === v ? ' aria-current="page"' : "";
+    const who = S.me
+      ? `${avatar({ id: S.me.id, name: S.me.name, avatar: S.me.avatarUrl })}<span><b>${esc(S.me.name || "You")}</b><small>${S.me.role === "moderator" ? "Moderator · " : ""}Your profile</small></span>`
+      : `<span class="av anon">${PERSON_SVG}</span><span><b>Sign in</b><small>Or create an account to chat</small></span>`;
+    drawer.innerHTML = `<div class="dr-in">
+      <div class="dr-head">
+        <button type="button" class="dr-who" data-go="profile"${here("profile")}>${who}</button>
+        <button type="button" class="dr-x" id="drClose" aria-label="Close menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      </div>
+      <nav class="dr-nav" aria-label="Sections">
+        <button type="button" class="dr-link" data-go="home"${here("home")}>Developing Stories${live ? `<span class="n">${live} LIVE</span>` : ""}</button>
+        <button type="button" class="dr-link" data-go="articles"${here("articles")}>Articles</button>
+      </nav>
+      <p class="dr-foot">Written by AI from official halifax.ca releases.</p>
+    </div>`;
+    $("#drClose").onclick = closeDrawer;
+  }
+  function openDrawer() {
+    renderDrawer();
+    drawer.classList.remove("closing");
+    drawer.showModal();
+    $("#meBtn").setAttribute("aria-expanded", "true");
+  }
+  function closeDrawer() {
+    if (!drawer.open) return;
+    $("#meBtn").setAttribute("aria-expanded", "false");
+    if (reducedMotion()) return drawer.close();
+    drawer.classList.add("closing");
+    setTimeout(() => { drawer.classList.remove("closing"); drawer.close(); }, 200);
+  }
+  drawer.addEventListener("cancel", e => { e.preventDefault(); closeDrawer(); }); // Escape slides it out too
+  drawer.addEventListener("click", e => { if (e.target === drawer) closeDrawer(); }); // tap on the dimmed page
+  window.matchMedia("(max-width: 760px)").addEventListener("change", e => { if (!e.matches) closeDrawer(); });
+  $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
+
+  // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
+  const VIEWS = ["home", "articles", "profile"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
-    else if (v !== "profile") v = "home";
+    else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     S.current = v;
     renderBanners(); // Home only
-    $("#home").hidden = v !== "home";
-    $("#profile").hidden = v !== "profile";
-    $("#article").hidden = v !== "article";
+    for (const id of [...VIEWS, "article"]) $("#" + id).hidden = v !== id;
     document.body.classList.toggle("wide-view", v === "article");
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
+    document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + (v === "article" ? "article-" + S.article : v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "profile") renderProfile(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else renderHome();
     applyChatState();
   }
-  const goTo = v => { show(v); window.scrollTo({ top: 0 }); };
+  const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-article]");
-    if (a) return goTo("article-" + a.dataset.article);
+    if (a) { e.preventDefault(); return goTo("article-" + a.dataset.article); }
     const g = e.target.closest("[data-go]");
-    if (g) goTo(g.dataset.go);
+    if (g) { e.preventDefault(); goTo(g.dataset.go); }
   });
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== (S.current === "article" ? "article-" + S.article : S.current)) goTo(h); });
 
@@ -696,6 +766,7 @@
   // In a normal browser tab the browser's own pull-to-refresh already does this, so it stays off there.
   async function refreshView() {
     if (S.current === "home") return Promise.all([loadStories(), loadWeather(), loadAlerts()]);
+    if (S.current === "articles") return loadStories();
     if (S.current === "profile") return loadMe();
     const id = S.article, before = S.full[id];
     let a;
@@ -704,7 +775,7 @@
     const col = $("#articleCol");
     // A story that changed kind or stage (e.g. moved to Articles) needs its whole page rebuilt
     if (!before || before.kind !== a.kind || before.stage !== a.stage || !col) return renderArticle();
-    col.innerHTML = BACK + articleHTML(a);
+    col.innerHTML = back(a) + articleHTML(a);
     wireStageTools();
     if ($("#cmList")) loadComments(id);
     if (a.kind === "article" && a.stage === "developing") connectRoom(id); // reconnects if iOS dropped the socket
@@ -768,7 +839,7 @@
   async function loadStories() {
     try { S.stories = (await getJSON("/api/stories")).stories; S.offline = false; }
     catch (e) { S.offline = !S.stories; }
-    if (S.current === "home") renderHome();
+    if (S.current === "home") renderHome(); else if (S.current === "articles") renderArticles();
   }
   async function loadWeather() {
     try { S.weather = (await getJSON("/api/weather")).weather; if (S.current === "home") renderToday(); } catch (e) {}
@@ -787,7 +858,7 @@
   show(location.hash.slice(1) || "home");
   Promise.all([loadMe(), loadStories(), loadWeather(), loadAlerts()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible
-  setInterval(() => { if (!document.hidden && S.current === "home") loadStories(); }, 20000);
+  setInterval(() => { if (!document.hidden && (S.current === "home" || S.current === "articles")) loadStories(); }, 20000);
   setInterval(() => { if (!document.hidden) { loadWeather(); loadAlerts(); } }, 10 * 60000);
   setInterval(() => { if (S.current === "home" && !document.hidden) renderToday(); }, 60000);
 })();
