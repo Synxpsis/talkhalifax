@@ -130,6 +130,12 @@ export class ArticleRoom extends DurableObject<Env> {
       this.broadcast({ t: "article", version: sig.version, note });
       this.broadcast({ t: "msg", m, profile: null });
       await this.updateStats();
+    } else if (sig.t === "recent") {
+      // For the newsroom's room_activity tool: the latest messages and how many people are here
+      const limit = Math.min(100, Math.max(1, Number((sig as { limit?: number }).limit) || 30));
+      const messages = this.ctx.storage.sql.exec<Message & Record<string, string | number>>(
+        "SELECT id, uid, text, at FROM messages ORDER BY at DESC LIMIT ?", limit).toArray().reverse();
+      return Response.json({ messages, hereNow: this.here().here.length });
     } else if (sig.t === "close") {
       this.broadcast({ t: "closed" });
       for (const ws of this.ctx.getWebSockets()) { try { ws.close(1000, "Moved to Articles"); } catch { /* already closing */ } }

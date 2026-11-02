@@ -1,6 +1,7 @@
 import { Env, json } from "./env";
 import { allow, currentUser, handleAuth, providers, sameOrigin } from "./auth";
-import { addComment, archiveStory, deleteComment, evaluateStages, listComments, newsroom, reopenStory } from "./stories";
+import { addComment, archiveStory, deleteComment, evaluateStages, listComments, listDrafts, newsroom, reopenStory, reviewDraft } from "./stories";
+import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
 export { ArticleRoom } from "./room";
 
@@ -62,13 +63,13 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
   }
 
   if (path === "/api/stories") {
-    const rows = await env.DB.prepare(`${STORY_SELECT} ORDER BY s.published_at DESC LIMIT 200`).all<StoryRow>();
+    const rows = await env.DB.prepare(`${STORY_SELECT} WHERE s.stage IN ('developing', 'archived') ORDER BY s.published_at DESC LIMIT 200`).all<StoryRow>();
     return json({ stories: rows.results.map(r => storyOut(r)) });
   }
 
   const one = path.match(/^\/api\/stories\/([A-Za-z0-9_.~-]{1,200})$/);
   if (one) {
-    const r = await env.DB.prepare(`${STORY_SELECT} WHERE s.id = ?`).bind(one[1]).first<StoryRow>();
+    const r = await env.DB.prepare(`${STORY_SELECT} WHERE s.id = ? AND s.stage IN ('developing', 'archived')`).bind(one[1]).first<StoryRow>();
     return r ? json({ story: storyOut(r, true) }) : json({ error: "Not found" }, { status: 404 });
   }
 
@@ -92,6 +93,22 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
     const u = await currentUser(req, env);
     if (!u) return json({ error: "Sign in first." }, { status: 401 });
     return deleteComment(env, cd[1], u);
+  }
+
+  // Moderators review drafts the newsroom held back (review: true)
+  if (path === "/api/review") {
+    const u = await currentUser(req, env);
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    return json({ drafts: await listDrafts(env) });
+  }
+  const rv = path.match(/^\/api\/stories\/([A-Za-z0-9_.~-]{1,200})\/review$/);
+  if (rv && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    const { action } = await req.json<{ action?: string }>().catch(() => ({ action: "" }));
+    if (action !== "approve" && action !== "discard") return json({ error: "action must be approve or discard" }, { status: 400 });
+    return (await reviewDraft(env, rv[1], action)) ? json({ ok: true }) : json({ error: "That draft is no longer waiting." }, { status: 409 });
   }
 
   // Moderators can move a story between Developing and Articles by hand
@@ -126,6 +143,8 @@ export default {
     try {
       if (url.pathname.startsWith("/auth/")) return (await handleAuth(req, env, url)) ?? new Response("Not found", { status: 404 });
       if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);
+      // The newsroom's MCP server, for Claude agents
+      if (url.pathname === "/mcp") return await mcp(req, env);
       const r = url.pathname.match(/^\/rooms\/([A-Za-z0-9_.~-]{1,200})\/ws$/);
       if (r) return await room(req, env, r[1]);
       return env.ASSETS.fetch(req);

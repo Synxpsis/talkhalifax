@@ -70,35 +70,39 @@ const API_NAMES: Record<string, typeof FIELDS[number]> = {
   statusLabel: "status_label", supersededBy: "superseded_by", readMin: "read_min", reason: "reason", source: "source_url", publishedAt: "published_at",
 };
 
-export async function newsroom(req: Request, env: Env, url: URL): Promise<Response> {
-  const token = env.NEWSROOM_TOKEN;
-  if (!token || req.headers.get("authorization") !== `Bearer ${token}`) return json({ error: "Unauthorized" }, { status: 401 });
-  const m = url.pathname.match(/^\/api\/newsroom\/stories\/([A-Za-z0-9_.~-]{1,200})$/);
-  if (!m || req.method !== "PUT") return json({ error: "Use PUT /api/newsroom/stories/<id>" }, { status: 404 });
-  const id = m[1];
-  let input: Record<string, unknown>;
-  try { input = await req.json(); } catch { return json({ error: "Body must be JSON" }, { status: 400 }); }
-  const note = String(input.note ?? "").slice(0, 300);
+export class NewsroomError extends Error {}
 
+/** Create a story (developing, or a draft held for review) or update an existing one. Shared by the REST endpoint and the MCP tools. */
+export async function saveStory(env: Env, id: string, input: Record<string, unknown>,
+  opts: { mode: "create" | "update" | "upsert"; review?: boolean; author?: string } = { mode: "upsert" }) {
+  if (!/^[A-Za-z0-9_.~-]{1,200}$/.test(id)) throw new NewsroomError("Story ids use letters, numbers, dots, dashes, underscores and tildes (up to 200).");
+  const note = String(input.note ?? "").slice(0, 300);
+  const author = (opts.author || "").slice(0, 60);
   const cols: Record<string, unknown> = {};
   for (const [apiName, col] of Object.entries(API_NAMES)) {
     if (input[apiName] === undefined) continue;
     cols[col] = JSON_FIELDS.has(col) ? JSON.stringify(input[apiName]) : input[apiName];
   }
+  if (cols.kind != null && !["article", "notice", "skip"].includes(String(cols.kind))) throw new NewsroomError("kind must be article, notice or skip.");
   const existing = await env.DB.prepare("SELECT version, stage FROM stories WHERE id = ?").bind(id).first<{ version: number; stage: string }>();
   const now = nowIso();
 
   if (!existing) {
-    for (const need of ["kind", "headline", "source_url", "published_at"]) if (cols[need] == null) return json({ error: `New stories need ${need}` }, { status: 400 });
+    if (opts.mode === "update") throw new NewsroomError(`No story with id ${id}. Use publish_story to create it.`);
+    for (const need of ["kind", "headline", "source_url", "published_at"]) if (cols[need] == null) throw new NewsroomError(`New stories need ${need === "source_url" ? "source" : need === "published_at" ? "publishedAt" : need}.`);
+    const stage = opts.review && cols.kind !== "skip" ? "draft" : "developing";
     const names = Object.keys(cols);
     await env.DB.prepare(
       `INSERT INTO stories (id, ${names.join(", ")}, stage, developing_since, last_newsroom_update, update_note, version, updated_at)
-       VALUES (?, ${names.map(() => "?").join(", ")}, 'developing', ?, ?, '', 1, ?)`,
-    ).bind(id, ...names.map(n => cols[n]), now, now, now).run();
-    await snapshot(env, id, 1, note || "Published");
-    return json({ ok: true, id, version: 1, created: true });
+       VALUES (?, ${names.map(() => "?").join(", ")}, ?, ?, ?, '', 1, ?)`,
+    ).bind(id, ...names.map(n => cols[n]), stage, now, now, now).run();
+    await snapshot(env, id, 1, note || (stage === "draft" ? "Drafted for review" : "Published"), author);
+    return { id, version: 1, created: true, stage };
   }
 
+  if (opts.mode === "create") throw new NewsroomError(`A story with id ${id} already exists (stage: ${existing.stage}). Use update_story to change it.`);
+  if (existing.stage === "discarded") throw new NewsroomError("That story was discarded by a moderator and can't be changed.");
+  if (!Object.keys(cols).length && input.reopen !== true) throw new NewsroomError("Nothing to change: pass at least one field.");
   const sets = Object.keys(cols).map(n => `${n} = ?`);
   const version = existing.version + 1;
   // An update to an archived article brings it back to Developing, chat and all
@@ -107,15 +111,52 @@ export async function newsroom(req: Request, env: Env, url: URL): Promise<Respon
     `UPDATE stories SET ${[...sets, "version = ?", "updated_at = ?", "last_newsroom_update = ?", "update_note = ?"].join(", ")}
        ${reopen ? ", stage = 'developing', developing_since = ?, archived_at = NULL" : ""} WHERE id = ?`,
   ).bind(...Object.values(cols), version, now, now, note, ...(reopen ? [now] : []), id).run();
-  await snapshot(env, id, version, note);
-  await tellRoom(env, id, { t: "updated", version, note });
-  return json({ ok: true, id, version, reopened: reopen });
+  await snapshot(env, id, version, note, author);
+  // Drafts have no readers yet; everything else tells its room
+  if (existing.stage !== "draft") await tellRoom(env, id, { t: "updated", version, note });
+  return { id, version, created: false, reopened: reopen, stage: reopen ? "developing" : existing.stage };
 }
 
-async function snapshot(env: Env, id: string, version: number, note: string) {
+export async function newsroom(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!newsroomAuthorized(req, env)) return json({ error: "Unauthorized" }, { status: 401 });
+  const m = url.pathname.match(/^\/api\/newsroom\/stories\/([A-Za-z0-9_.~-]{1,200})$/);
+  if (!m || req.method !== "PUT") return json({ error: "Use PUT /api/newsroom/stories/<id>" }, { status: 404 });
+  let input: Record<string, unknown>;
+  try { input = await req.json(); } catch { return json({ error: "Body must be JSON" }, { status: 400 }); }
+  try {
+    const r = await saveStory(env, m[1], input, { mode: "upsert", review: input.review === true, author: String(input.author || "newsroom-script") });
+    return json({ ok: true, ...r });
+  } catch (e) {
+    if (e instanceof NewsroomError) return json({ error: e.message }, { status: 400 });
+    throw e;
+  }
+}
+
+export const newsroomAuthorized = (req: Request, env: Env) =>
+  !!env.NEWSROOM_TOKEN && req.headers.get("authorization") === `Bearer ${env.NEWSROOM_TOKEN}`;
+
+async function snapshot(env: Env, id: string, version: number, note: string, author = "") {
   const row = await env.DB.prepare(`SELECT ${FIELDS.join(", ")} FROM stories WHERE id = ?`).bind(id).first();
-  await env.DB.prepare("INSERT INTO story_versions (story_id, version, snapshot, note, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(id, version, JSON.stringify(row), note, nowIso()).run();
+  await env.DB.prepare("INSERT INTO story_versions (story_id, version, snapshot, note, created_at, author) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(id, version, JSON.stringify(row), note, nowIso(), author).run();
+}
+
+// ---------- Review: moderators approve or discard drafts ----------
+export async function listDrafts(env: Env) {
+  const rows = await env.DB.prepare(
+    `SELECT s.id, s.kind, s.headline, s.dek, s.area, s.facts, s.body, s.means, s.source_url AS source, s.updated_at AS updatedAt,
+            (SELECT author FROM story_versions v WHERE v.story_id = s.id ORDER BY version DESC LIMIT 1) AS author
+       FROM stories s WHERE s.stage = 'draft' ORDER BY s.updated_at DESC`,
+  ).all<Record<string, string>>();
+  return rows.results.map(r => ({ ...r, facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means) }));
+}
+
+export async function reviewDraft(env: Env, id: string, action: "approve" | "discard") {
+  const now = nowIso();
+  const res = action === "approve"
+    ? await env.DB.prepare("UPDATE stories SET stage = 'developing', developing_since = ?, updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, now, id).run()
+    : await env.DB.prepare("UPDATE stories SET stage = 'discarded', updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, id).run();
+  return !!res.meta.changes;
 }
 
 // ---------- Comments on Articles ----------

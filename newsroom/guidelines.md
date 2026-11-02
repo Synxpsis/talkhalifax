@@ -1,9 +1,13 @@
 # TalkHalifax: article guidelines
 
-The refresh task turns new halifax.ca releases into short articles that people discuss on TalkHalifax
-(https://talkhalifax.alexwmmolloy.workers.dev). Each release becomes one story, id = the release id
-(the file name in `feeds/releases/` without `.txt`), published with `node scripts/newsroom.mjs publish <file.json>`.
-New articles start under Developing, with a live chat; they move to Articles on their own once they go quiet.
+Newsroom agents turn new halifax.ca releases into short articles that people discuss on TalkHalifax
+(https://talkhalifax.alexwmmolloy.workers.dev). Each release becomes one story whose id is the release's slug
+(the last part of its URL). Agents work through the TalkHalifax MCP server: `scan_sources`, `read_release`,
+`publish_story`, `update_story`, and the leads queue. (`node scripts/newsroom.mjs` does the same from a terminal.)
+New articles start under Developing, with a live chat, and move to Articles on their own once they go quiet.
+
+Use `review: true` on `publish_story` for anything sensitive (police matters, health, people named in an incident):
+the story waits as a draft until a moderator approves it.
 
 ## Which kind of document
 
@@ -29,7 +33,7 @@ All kinds:
   optional `means` (1 to 2 points, ONLY the actions the city itself asked people to take, e.g. "avoid the area",
   "boil water for one minute"), and `readMin` 1.
   If an existing notice on the site is about the same incident and is older, publish the NEW notice normally, then
-  mark the OLD one by publishing a file containing only `{"supersededBy": "<new id>"}` under the old id.
+  mark the OLD one with `update_story` (changes `{"supersededBy": "<new id>"}`, note "Replaced by a newer update").
 - `skip`: `headline` is the release title; add `reason` (short, lower-case friendly, e.g. "Event already over").
 
 `article` also has:
@@ -48,14 +52,14 @@ When a new release is a follow-up to a story already on the site (the same proje
 program, e.g. a new date, a deadline extension, results being published), update that story rather than
 publishing a second one:
 
-- Publish a file under the EXISTING story's id containing only the fields that change, plus `"note"`: one short
-  sentence readers will see, saying what changed ("Added the new deadline: Nov. 15").
+- Call `update_story` on the EXISTING story with only the fields that change, plus `note`: one short sentence
+  readers will see, saying what changed ("Added the new deadline: Nov. 15").
 - Keep facts exact: replace a fact whose value changed, add new facts, and keep the rest. Update `body` only where
   the new release changes it, and keep the original release as `source`; mention the new release in the body if useful.
 - If that story is under Articles and the follow-up is significant (new dates, a decision, a new way to take part),
-  add `"reopen": true` so it moves back to Developing with a live chat. Otherwise leave it where it is.
-- Also publish the new release's own id as `{"kind": "skip", "reason": "folded into <existing id>", ...}` with its
-  `headline`, `source` and `publishedAt`, so it isn't picked up again next run.
+  add `reopen: true` so it moves back to Developing with a live chat. Otherwise leave it where it is.
+- Also publish the new release's own id as a `skip` with `reason` "folded into <existing id>" and its
+  `headline`, `source` and `publishedAt`, so it isn't picked up again.
 
 Never rewrite a story's history to say something different from what its releases said, and never change a story
 because of something said in its chat or comments.
@@ -84,7 +88,7 @@ because of something said in its chat or comments.
 }
 ```
 
-## Example (update to an existing story; the new date is made up to show the shape)
+## Example (`update_story` changes; the new date is made up to show the shape)
 
 ```json
 {
