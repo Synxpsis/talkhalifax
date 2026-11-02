@@ -682,6 +682,74 @@
   });
   window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== (S.current === "article" ? "article-" + S.article : S.current)) goTo(h); });
 
+  // ---------- Pull to refresh ----------
+  // Home-screen web apps on iOS have no browser reload, so pulling down from the top refreshes the current view.
+  // In a normal browser tab the browser's own pull-to-refresh already does this, so it stays off there.
+  async function refreshView() {
+    if (S.current === "home") return Promise.all([loadStories(), loadWeather(), loadAlerts()]);
+    if (S.current === "profile") return loadMe();
+    const id = S.article, before = S.full[id];
+    let a;
+    try { a = await fetchStory(id); } catch (e) { return; }
+    if (S.current !== "article" || S.article !== id) return;
+    const col = $("#articleCol");
+    // A story that changed kind or stage (e.g. moved to Articles) needs its whole page rebuilt
+    if (!before || before.kind !== a.kind || before.stage !== a.stage || !col) return renderArticle();
+    col.innerHTML = BACK + articleHTML(a);
+    wireStageTools();
+    if ($("#cmList")) loadComments(id);
+    if (a.kind === "article" && a.stage === "developing") connectRoom(id); // reconnects if iOS dropped the socket
+  }
+
+  const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+  if (standalone && "ontouchstart" in window) {
+    const THRESHOLD = 70, MAX = 110;
+    const ptr = document.createElement("div");
+    ptr.className = "ptr glass";
+    ptr.setAttribute("aria-hidden", "true");
+    ptr.innerHTML = '<svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v13M6 12l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      + '<svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 4a8 8 0 1 0 8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+    document.body.appendChild(ptr);
+    const status = document.createElement("div");
+    status.className = "sr"; status.setAttribute("role", "status");
+    document.body.appendChild(status);
+    let startY = null, startX = 0, pull = 0, busy = false;
+    const paint = () => {
+      const p = Math.min(1, pull / THRESHOLD);
+      ptr.style.transform = `translate(-50%, ${pull ? Math.min(pull, MAX) - 52 : -52}px) rotate(${busy ? 0 : p * 180}deg)`;
+      ptr.style.opacity = busy ? 1 : p;
+      ptr.classList.toggle("ready", !busy && pull >= THRESHOLD);
+    };
+    document.addEventListener("touchstart", e => {
+      const t = e.target;
+      if (busy || e.touches.length !== 1 || window.scrollY > 0 || t.closest(".chat, input, textarea, [contenteditable]")) { startY = null; return; }
+      startY = e.touches[0].clientY; startX = e.touches[0].clientX; pull = 0;
+    }, { passive: true });
+    document.addEventListener("touchmove", e => {
+      if (startY == null) return;
+      const dy = e.touches[0].clientY - startY, dx = e.touches[0].clientX - startX;
+      if (dy <= 0 || Math.abs(dx) > dy || window.scrollY > 0) { if (pull) { pull = 0; paint(); } return; }
+      pull = dy * 0.5;
+      ptr.classList.add("drag");
+      paint();
+    }, { passive: true });
+    const end = async () => {
+      if (startY == null) return;
+      startY = null;
+      ptr.classList.remove("drag");
+      if (pull < THRESHOLD) { pull = 0; paint(); return; }
+      busy = true; pull = THRESHOLD; ptr.classList.add("busy"); paint();
+      status.textContent = "Refreshing";
+      const minSpin = new Promise(r => setTimeout(r, 500)); // long enough to see that something happened
+      try { await Promise.all([refreshView(), minSpin]); } catch (e) {}
+      busy = false; pull = 0; ptr.classList.remove("busy"); paint();
+      status.textContent = "Updated";
+    };
+    document.addEventListener("touchend", end);
+    document.addEventListener("touchcancel", () => { startY = null; ptr.classList.remove("drag"); if (!busy) { pull = 0; paint(); } });
+    paint();
+  }
+
   // The docked chat sits just under the sticky header, whatever its height
   const hdr = document.querySelector("header");
   const setHdr = () => document.documentElement.style.setProperty("--hdr", hdr.offsetHeight + "px");
