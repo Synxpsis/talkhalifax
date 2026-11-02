@@ -1,0 +1,141 @@
+import { Env, json } from "./env";
+import { allow, currentUser, handleAuth, providers, sameOrigin } from "./auth";
+import { addComment, archiveStory, deleteComment, evaluateStages, listComments, newsroom, reopenStory } from "./stories";
+import { getWeather, refreshWeather } from "./weather";
+export { ArticleRoom } from "./room";
+
+interface StoryRow {
+  id: string; kind: string; status: string; section: string; area: string; headline: string; dek: string;
+  facts: string; body: string; means: string; status_label: string; superseded_by: string | null;
+  read_min: number; reason: string; source_url: string; published_at: string; version: number; updated_at: string;
+  message_count: number | null; here_now: number | null; last_message_at: number | null;
+  last_author_id: string | null; last_author_name: string | null;
+  stage: string; developing_since: string | null; archived_at: string | null; last_newsroom_update: string | null; update_note: string;
+  comment_count: number; last_comment_at: number | null;
+}
+
+const storyOut = (r: StoryRow, full = false) => ({
+  id: r.id, kind: r.kind, status: r.status, section: r.section, area: r.area,
+  headline: r.headline, dek: r.dek, statusLabel: r.status_label, supersededBy: r.superseded_by,
+  readMin: r.read_min, reason: r.reason, source: r.source_url, publishedAt: r.published_at,
+  version: r.version, updatedAt: r.updated_at,
+  stage: r.stage, developingSince: r.developing_since || r.published_at, archivedAt: r.archived_at,
+  lastUpdate: r.last_newsroom_update, updateNote: r.update_note,
+  comments: { count: r.comment_count ?? 0, lastAt: r.last_comment_at },
+  room: { messages: r.message_count ?? 0, here: r.here_now ?? 0, lastAt: r.last_message_at, lastAuthor: r.last_author_name || null },
+  ...(full ? { facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means) } : {}),
+});
+
+const STORY_SELECT = `
+  SELECT s.*, rs.message_count, rs.here_now, rs.last_message_at, rs.last_author_id, u.name AS last_author_name,
+         (SELECT COUNT(*) FROM comments c WHERE c.story_id = s.id AND c.deleted = 0) AS comment_count,
+         (SELECT MAX(created_at) FROM comments c WHERE c.story_id = s.id AND c.deleted = 0) AS last_comment_at
+    FROM stories s
+    LEFT JOIN room_stats rs ON rs.story_id = s.id
+    LEFT JOIN users u ON u.id = rs.last_author_id`;
+
+async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
+  const path = url.pathname;
+
+  if (path === "/api/me") {
+    const u = await currentUser(req, env);
+    return json({
+      user: u ? { id: u.id, name: u.name, avatarUrl: u.avatar_url, role: u.role, banned: !!u.banned } : null,
+      providers: providers(env, url),
+    });
+  }
+
+  if (path === "/api/me/messages") {
+    const u = await currentUser(req, env);
+    if (!u) return json({ error: "Not signed in" }, { status: 401 });
+    const rows = await env.DB.prepare(
+      `SELECT m.id, m.story_id AS storyId, m.text, m.created_at AS at, s.headline
+         FROM message_index m LEFT JOIN stories s ON s.id = m.story_id
+        WHERE m.user_id = ? AND m.deleted = 0 ORDER BY m.created_at DESC LIMIT 50`,
+    ).bind(u.id).all();
+    const stats = await env.DB.prepare(
+      `SELECT COUNT(*) AS messages, COUNT(DISTINCT story_id) AS rooms,
+              SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) AS today
+         FROM message_index WHERE user_id = ? AND deleted = 0`,
+    ).bind(Date.now() - 864e5, u.id).first();
+    return json({ messages: rows.results, stats });
+  }
+
+  if (path === "/api/stories") {
+    const rows = await env.DB.prepare(`${STORY_SELECT} ORDER BY s.published_at DESC LIMIT 200`).all<StoryRow>();
+    return json({ stories: rows.results.map(r => storyOut(r)) });
+  }
+
+  const one = path.match(/^\/api\/stories\/([A-Za-z0-9_.~-]{1,200})$/);
+  if (one) {
+    const r = await env.DB.prepare(`${STORY_SELECT} WHERE s.id = ?`).bind(one[1]).first<StoryRow>();
+    return r ? json({ story: storyOut(r, true) }) : json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
+
+  // The newsroom (Claude) publishes and updates stories here, with its own token
+  if (path.startsWith("/api/newsroom/")) return newsroom(req, env, url);
+
+  // Threaded comments, once a story has moved to Articles
+  const cm = path.match(/^\/api\/stories\/([A-Za-z0-9_.~-]{1,200})\/comments$/);
+  if (cm) {
+    if (req.method === "GET") return listComments(env, cm[1]);
+    if (req.method !== "POST" || !sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u) return json({ error: "Sign in to comment." }, { status: 401 });
+    return addComment(req, env, cm[1], u, (k, n, w) => allow(env, k, n, w));
+  }
+  const cd = path.match(/^\/api\/comments\/([A-Za-z0-9_]{1,40})$/);
+  if (cd && req.method === "DELETE") {
+    if (req.headers.get("origin") !== url.origin) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u) return json({ error: "Sign in first." }, { status: 401 });
+    return deleteComment(env, cd[1], u);
+  }
+
+  // Moderators can move a story between Developing and Articles by hand
+  const st = path.match(/^\/api\/stories\/([A-Za-z0-9_.~-]{1,200})\/stage$/);
+  if (st && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    const { stage } = await req.json<{ stage?: string }>().catch(() => ({ stage: "" }));
+    const ok = stage === "archived" ? await archiveStory(env, st[1], "moderator") : stage === "developing" ? await reopenStory(env, st[1]) : false;
+    return ok ? json({ ok: true }) : json({ error: "Nothing to change." }, { status: 409 });
+  }
+
+  return json({ error: "Not found" }, { status: 404 });
+}
+
+/** Upgrade to the story's ArticleRoom, passing who this is. Client-sent x-th-* headers are never forwarded. */
+async function room(req: Request, env: Env, id: string): Promise<Response> {
+  if (req.headers.get("upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 });
+  const story = await env.DB.prepare("SELECT kind, stage FROM stories WHERE id = ?").bind(id).first<{ kind: string; stage: string }>();
+  if (!story || story.kind !== "article" || story.stage !== "developing") return new Response("This story has no live chat", { status: 404 });
+  const u = await currentUser(req, env);
+  const headers = new Headers({ upgrade: "websocket", "x-th-story": id });
+  if (u) { headers.set("x-th-user", u.id); headers.set("x-th-role", u.role); headers.set("x-th-banned", u.banned ? "1" : "0"); }
+  const stub = env.ROOMS.get(env.ROOMS.idFromName(id));
+  return stub.fetch(new Request(`https://room/${encodeURIComponent(id)}`, { headers }));
+}
+
+export default {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(req.url);
+    try {
+      if (url.pathname.startsWith("/auth/")) return (await handleAuth(req, env, url)) ?? new Response("Not found", { status: 404 });
+      if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);
+      const r = url.pathname.match(/^\/rooms\/([A-Za-z0-9_.~-]{1,200})\/ws$/);
+      if (r) return await room(req, env, r[1]);
+      return env.ASSETS.fetch(req);
+    } catch (e) {
+      console.error(e);
+      return json({ error: "Something went wrong" }, { status: 500 });
+    }
+  },
+
+  async scheduled(_event: ScheduledController, env: Env) {
+    await Promise.allSettled([refreshWeather(env), evaluateStages(env)]);
+  },
+} satisfies ExportedHandler<Env>;

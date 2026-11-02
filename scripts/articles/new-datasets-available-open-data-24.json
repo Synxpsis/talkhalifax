@@ -1,0 +1,33 @@
+{
+ "kind": "article",
+ "area": "Open Data",
+ "section": "City Hall",
+ "publishedAt": "2026-10-28T16:16:40Z",
+ "readMin": 1,
+ "headline": "Three new city datasets, including work orders mapped across Halifax",
+ "dek": "The municipality's Open Data catalogue now holds 294 free datasets.",
+ "facts": [
+  {
+   "k": "New",
+   "v": "Cityworks Work Orders Geolocated; Municipal Operating Revenues and Expenses; Safe School Streets"
+  },
+  {
+   "k": "Total",
+   "v": "294 datasets"
+  },
+  {
+   "k": "Cost",
+   "v": "Free"
+  }
+ ],
+ "body": [
+  "The Halifax Regional Municipality released three new datasets on its Open Data site on Oct. 28: geolocated Cityworks work orders, municipal operating revenues and expenses, and Safe School Streets.",
+  "That brings the catalogue to 294 datasets. Others include transit routes and schedules, solid waste collection schedules and area rates. The previous release was on Sept. 9.",
+  "Open Data started in early 2014. Regional Council formalized it later that year with Administrative Order 2014-006-ADM."
+ ],
+ "means": [
+  "Developers, researchers and curious residents can download all of it free from the city's Open Data page."
+ ],
+ "source": "https://www.halifax.ca/home/news/new-datasets-available-open-data-24",
+ "writtenAt": "2026-11-01T23:30:00Z"
+}

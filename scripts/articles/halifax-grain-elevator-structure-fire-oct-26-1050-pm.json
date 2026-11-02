@@ -1,0 +1,39 @@
+{
+ "kind": "notice",
+ "area": "South End",
+ "section": "City Hall",
+ "publishedAt": "2026-10-27T01:44:10Z",
+ "readMin": 1,
+ "status": "Earlier update",
+ "supersededBy": "halifax-grain-elevator-structure-fire-oct-27-730-am",
+ "headline": "Fire at the Halifax Grain Elevator on Marginal Road",
+ "dek": "Crews responded to flames in the facility's dust management system, about 135 feet above the ground.",
+ "facts": [
+  {
+   "k": "Reported",
+   "v": "Approximately 7:15 p.m., Oct. 26"
+  },
+  {
+   "k": "Where",
+   "v": "Halifax Grain Elevator property, 730 Marginal Road"
+  },
+  {
+   "k": "Peak response",
+   "v": "Three alarms"
+  },
+  {
+   "k": "Emergency alerts",
+   "v": "halifax.ca/hfxalert"
+  }
+ ],
+ "body": [
+  "Halifax Regional Fire & Emergency responded to a 911 call at approximately 7:15 p.m. after a report of visible flames at the Halifax Grain Elevator property at 730 Marginal Road.",
+  "Crews found an incident involving the facility's dust management system, approximately 135 feet above ground level. At its peak the incident required a three-alarm response, and resources were later reduced as the risk decreased. The city described it as complex because of the industrial infrastructure, the height of the work and a vessel alongside the facility.",
+  "Residents were asked to avoid the area. The origin and cause had not yet been determined."
+ ],
+ "means": [
+  "Sign up for hfxALERT, the municipality's emergency notification system, at halifax.ca/hfxalert to get alerts by phone, email or text."
+ ],
+ "source": "https://www.halifax.ca/home/news/halifax-grain-elevator-structure-fire-oct-26-1050-pm",
+ "writtenAt": "2026-11-01T23:55:00Z"
+}

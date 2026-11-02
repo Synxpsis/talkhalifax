@@ -1,0 +1,35 @@
+{
+ "kind": "notice",
+ "area": "South End",
+ "section": "City Hall",
+ "publishedAt": "2026-10-27T10:19:34Z",
+ "readMin": 1,
+ "status": "Final update",
+ "headline": "Grain elevator fire on Marginal Road is out. Cause under investigation",
+ "dek": "The city says this is the final update on the Oct. 26 fire at the Halifax Grain Elevator.",
+ "facts": [
+  {
+   "k": "Status",
+   "v": "Declared under control at approximately 10:40 p.m., Monday, Oct. 26"
+  },
+  {
+   "k": "Where",
+   "v": "Halifax Grain Elevator property, 730 Marginal Road"
+  },
+  {
+   "k": "Response",
+   "v": "Approximately 20 firefighting, command, safety and support fire apparatus at the height of the response"
+  },
+  {
+   "k": "Cause",
+   "v": "Under investigation"
+  }
+ ],
+ "body": [
+  "The fire at the Halifax Grain Elevator property at 730 Marginal Road was declared under control at approximately 10:40 p.m. on Monday, Oct. 26, and crews have since left the scene.",
+  "Halifax Regional Fire & Emergency responded at approximately 7:15 p.m. after a report of visible flames. The fire was contained to the south conveyor system's dust handling equipment and associated hopper infrastructure, and it did not spread to surrounding structures.",
+  "The scene was secured and turned over for investigation. The origin and cause of the fire are under investigation."
+ ],
+ "source": "https://www.halifax.ca/home/news/halifax-grain-elevator-structure-fire-oct-27-730-am",
+ "writtenAt": "2026-11-01T23:55:00Z"
+}

@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+scripts/seed.sql
+.env
+.newsroom-token
+prototype/feeds/
+prototype/.preview/
