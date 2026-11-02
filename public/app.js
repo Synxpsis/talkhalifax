@@ -42,7 +42,7 @@
   function avatar(p, cls = "av") {
     if (p && p.avatar) return `<span class="${cls}"><img alt="" src="${esc(p.avatar)}" referrerpolicy="no-referrer"></span>`;
     const name = (p && p.name) || "?";
-    return `<span class="${cls}" style="background:${p ? hue(p.id) : "var(--line)"}" aria-hidden="true">${esc(name.trim()[0] || "?").toUpperCase()}</span>`;
+    return `<span class="${cls}" style="background:${p ? hue(p.id) : "var(--ink-faint)"}" aria-hidden="true">${esc(name.trim()[0] || "?").toUpperCase()}</span>`;
   }
   const nameOf = uid => uid === (S.me && S.me.id) ? "You" : (room.profiles[uid] && room.profiles[uid].name) || "Someone";
 
