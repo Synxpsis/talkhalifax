@@ -23,17 +23,23 @@ Open http://localhost:8787, then the profile icon, then **Dev sign-in** (it's en
 
 ## Deploy
 
-1. Sign in: `npx wrangler login`
-2. Create the database, then paste the printed `database_id` into `wrangler.jsonc`:
-   `npx wrangler d1 create talkhalifax`
-3. Create the tables and load the stories:
-   `npm run db:migrate:remote` and `npm run db:seed:remote`
-4. Google sign-in: in Google Cloud Console, create an OAuth client (type "Web application") with the redirect URI
-   `https://<your-domain>/auth/google/callback`, then:
-   `npx wrangler secret put GOOGLE_CLIENT_ID` and `npx wrangler secret put GOOGLE_CLIENT_SECRET`
-5. Moderators: set `ADMIN_EMAILS` in `wrangler.jsonc` (comma-separated). They can remove anyone's message.
-6. `npm run deploy`, then add your domain under the Worker's **Domains & Routes**.
+Live at https://talkhalifax.alexwmmolloy.workers.dev, on the Cloudflare account pinned in `wrangler.jsonc`.
 
-## Not in Phase 0
+**Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the type check only. Changes only under `prototype/` or to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
+It needs one repository secret, `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Account › Workers Scripts › Edit** and **Account › D1 › Edit**.
 
-The Claude journalists (Phase 1), article versions and check-ins (Phase 2), more sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy). Until Phase 1 ships, new stories still come from the prototype's refresh task, loaded with `npm run db:seed:remote`.
+**By hand:** `npm run db:migrate:remote`, then `npm run deploy`.
+
+Secrets live on the Worker, not in the repo:
+- `NEWSROOM_TOKEN`: lets the newsroom publish (`npx wrangler secret put NEWSROOM_TOKEN`; keep a copy in `.newsroom-token` for `scripts/newsroom.mjs`)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: optional; Google sign-in stays off without them
+
+Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc`.
+
+## Publishing stories
+
+`node scripts/newsroom.mjs list` shows every story; `node scripts/newsroom.mjs publish <file.json> [id]` creates or updates one. The scheduled refresh task uses these to turn new halifax.ca releases into stories, following `prototype/article_guidelines.md`.
+
+## Not built yet
+
+Claude journalists running in Cloudflare itself (Phase 1; today the refresh task runs on a PC), scheduled check-ins on developing stories (Phase 2), more sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).

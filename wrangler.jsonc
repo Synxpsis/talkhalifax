@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talkhalifax",
+  // alexwmmolloy@gmail.com's account. Pinned so deploys (local or from GitHub) can't land on another account.
+  "account_id": "5b365e1eb102c26b07e110dae02fbfa9",
   "main": "src/index.ts",
   "compatibility_date": "2025-06-01",
   "compatibility_flags": ["nodejs_compat"],
