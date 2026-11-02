@@ -98,6 +98,16 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 .card.notice .k { color: var(--warn); }
 .card.notice .tt { font-size: 15.5px; font-weight: 600; flex: 1 1 280px; }
 .card.notice .ft { margin: 0; padding: 0; }
+.alerts { list-style: none; margin: 0; padding: 0; }
+.alerts li { display: grid; grid-template-columns: 10.5em 1fr; gap: 2px 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.alerts .ac { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.alerts .ac.weather { color: var(--warn); }
+.alerts a { font-size: 15px; font-weight: 500; color: var(--ink); text-decoration: none; }
+.alerts a:hover { text-decoration: underline; }
+.alerts .ad { grid-column: 2; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+.alerts-more { all: unset; cursor: pointer; margin-top: 10px; font-size: 13.5px; color: var(--accent); }
+.alerts-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 560px) { .alerts li { grid-template-columns: 1fr; } .alerts .ad { grid-column: 1; } }
 .forum-foot { margin-top: 18px; font-size: 13px; color: var(--muted); }
 
 /* Status lists */
@@ -359,6 +369,12 @@ img { max-width: 100%; }
     </div>
     <p class="forum-lede">Stories the newsroom is still following. Claude updates them as news comes in, and each one has a live chat.</p>
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>
+
+    <div class="forum-top section-gap">
+      <h2 class="sect-title">Getting around</h2>
+    </div>
+    <p class="forum-lede">Road work, transit detours and weather warnings, as the city and Environment Canada post them.</p>
+    <div id="alerts"><div class="msg">Loading…</div></div>
 
     <div class="forum-top section-gap">
       <h2 class="sect-title">Articles</h2>

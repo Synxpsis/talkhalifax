@@ -24,7 +24,7 @@
 
   // ---------- State ----------
   const S = {
-    me: null, providers: {}, stories: null, full: {}, weather: null, offline: false,
+    me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, allAlerts: false, offline: false,
     sort: "active", current: "home", article: null,
   };
   const room = { ws: null, id: null, messages: [], profiles: {}, here: [], readers: 0, you: null, error: "", typing: false, armed: null, armedTimer: null, tries: 0, closing: false };
@@ -60,8 +60,26 @@
     $("#todayLine").innerHTML = bits.join("");
   }
 
+  /** Getting around: official road, transit and weather notices, linked to their source. */
+  const ALERT_ORDER = { Weather: 0, Roads: 1, "Windsor Street Exchange": 2, Transit: 3 };
+  function renderAlerts() {
+    const el = $("#alerts");
+    if (!S.alerts) { el.innerHTML = `<div class="msg">${S.offline ? "Road and transit notices aren't available right now." : "Loading…"}</div>`; return; }
+    const items = S.alerts.items.slice().sort((a, b) => (ALERT_ORDER[a.cat] - ALERT_ORDER[b.cat]) || String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
+    if (!items.length) { el.innerHTML = '<div class="msg">No road, transit or weather notices right now.</div>'; return; }
+    const shown = S.allAlerts ? items : items.slice(0, 6);
+    el.innerHTML = `<ul class="alerts">${shown.map(a => `<li>
+        <span class="ac${a.cat === "Weather" ? " weather" : ""}">${esc(a.cat === "Windsor Street Exchange" ? "Windsor St. Exch." : a.cat)} · ${esc(a.kind)}</span>
+        <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+        ${a.detail || a.until ? `<span class="ad">${a.until ? `Until ${esc(a.until)}. ` : ""}${esc(a.detail)}</span>` : ""}
+      </li>`).join("")}</ul>` + (items.length > shown.length ? `<button type="button" class="alerts-more" id="alertsMore">Show all ${items.length}</button>` : "");
+    const more = $("#alertsMore");
+    if (more) more.onclick = () => { S.allAlerts = true; renderAlerts(); };
+  }
+
   function renderHome() {
     renderToday();
+    renderAlerts();
     document.querySelectorAll(".sort").forEach(b => b.setAttribute("aria-pressed", b.dataset.sort === S.sort));
     if (!S.stories) {
       const m = `<div class="msg">${S.offline ? "TalkHalifax can't reach its server right now. Check your connection and reload." : "Loading…"}</div>`;
@@ -678,6 +696,10 @@
   async function loadWeather() {
     try { S.weather = (await getJSON("/api/weather")).weather; if (S.current === "home") renderToday(); } catch (e) {}
   }
+  async function loadAlerts() {
+    try { S.alerts = (await getJSON("/api/alerts")).alerts || { items: [] }; } catch (e) {}
+    if (S.current === "home") renderAlerts();
+  }
   async function loadMe() {
     try { const d = await getJSON("/api/me"); S.me = d.user; S.providers = d.providers; } catch (e) {}
     renderMeButton();
@@ -686,9 +708,9 @@
   }
 
   show(location.hash.slice(1) || "home");
-  Promise.all([loadMe(), loadStories(), loadWeather()]);
+  Promise.all([loadMe(), loadStories(), loadWeather(), loadAlerts()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible
   setInterval(() => { if (!document.hidden && S.current === "home") loadStories(); }, 20000);
-  setInterval(() => { if (!document.hidden) loadWeather(); }, 10 * 60000);
+  setInterval(() => { if (!document.hidden) { loadWeather(); loadAlerts(); } }, 10 * 60000);
   setInterval(() => { if (S.current === "home" && !document.hidden) renderToday(); }, 60000);
 })();

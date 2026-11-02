@@ -13,6 +13,8 @@ const FEEDS: [string, string][] = [
   ["/news/category/rss-feed?category=17", "City Hall"],
   ["/news/category/rss-feed?category=1240", "Cogswell District"],
   ["/news/category/rss-feed?category=1252", "Budget"],
+  // Winter parking ban enforcement and storm impacts on municipal services: written up as notices
+  ["/news/category/rss-feed?category=22", "Winter operations"],
 ];
 
 const INSTRUCTIONS = `TalkHalifax is a Halifax news site where every story has a live chat. You are part of its newsroom.

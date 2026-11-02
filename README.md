@@ -3,7 +3,8 @@
 Halifax news, rewritten as short articles with a live chat in each one. Runs on Cloudflare Workers.
 
 - `public/`: the page (`index.html`, `app.js`), served as static assets
-- `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather and tides
+- `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts
+- `src/alerts.ts`: the home page's Getting around list: halifax.ca road notices and Windsor Street Exchange work, Halifax Transit detours, and Environment Canada weather warnings, shown as posted with links (not rewritten)
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing
 - `src/auth.ts`: sessions (HttpOnly cookie), Google sign-in, and a localhost-only dev sign-in
 - `migrations/`: the D1 schema. `scripts/articles/` plus `scripts/build-seed.mjs` load the current stories.
@@ -46,4 +47,4 @@ Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work thr
 
 ## Not built yet
 
-More sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
+Library events (the rest of Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).

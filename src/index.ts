@@ -3,6 +3,7 @@ import { allow, currentUser, handleAuth, providers, sameOrigin } from "./auth";
 import { addComment, archiveStory, deleteComment, evaluateStages, listComments, listDrafts, newsroom, reopenStory, reviewDraft } from "./stories";
 import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
+import { getAlerts, refreshAlerts } from "./alerts";
 export { ArticleRoom } from "./room";
 
 interface StoryRow {
@@ -74,6 +75,7 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
   }
 
   if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
+  if (path === "/api/alerts") return json({ alerts: await getAlerts(env, ctx) });
 
   // The newsroom (Claude) publishes and updates stories here, with its own token
   if (path.startsWith("/api/newsroom/")) return newsroom(req, env, url);
@@ -155,6 +157,6 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    await Promise.allSettled([refreshWeather(env), evaluateStages(env)]);
+    await Promise.allSettled([refreshWeather(env), refreshAlerts(env), evaluateStages(env)]);
   },
 } satisfies ExportedHandler<Env>;

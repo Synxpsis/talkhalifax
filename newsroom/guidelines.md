@@ -19,6 +19,12 @@ Decide one `kind` per release:
   advisories, odour or hazmat investigations, police matters, missing persons, service outages (e.g. 311 down).
   Notices are read on TalkHalifax (nobody is sent off-site) but are facts only: a plain restatement of what the
   city said, no interpretation, no "what this means" commentary, and comments are off.
+  Winter operations releases (section "Winter operations") are always notices: the overnight winter parking ban
+  being enforced or lifted, and storm impacts on municipal services. Each one replaces the previous notice of the
+  same kind: publish the new one, then mark the older one `supersededBy` it. A parking ban notice's headline states
+  the enforcement window exactly as the release does (e.g. "Overnight winter parking ban enforced 1-6 a.m. Wednesday, March 4").
+  If the window in a ban release has already passed by the time you write, publish it as a `skip` with `reason`
+  "Enforcement window already over".
 - `skip`: nothing left to act on or discuss, e.g. an event that is already over, or a holiday service-hours
   notice whose date has passed. Add a short `reason`.
 

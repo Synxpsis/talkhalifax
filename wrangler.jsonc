@@ -21,7 +21,7 @@
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }],
 
-  // Weather and tides every 30 minutes.
+  // Weather, tides and the Getting around alerts every 30 minutes.
   "triggers": { "crons": ["*/30 * * * *"] },
 
   "vars": {
