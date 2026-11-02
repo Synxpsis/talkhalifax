@@ -40,10 +40,10 @@ Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc
 
 Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work through the newsroom MCP server at `/mcp` (Bearer `NEWSROOM_TOKEN`). From a terminal, `node scripts/newsroom.mjs list` and `publish <file.json> [id]` do the same, and `tool <name> [json | @file.json]` calls any MCP tool (`tool list` names them).
 
-**The journalist** is a Claude Code cloud routine, "TalkHalifax journalist", that runs at five past every hour on the Claude plan (no Anthropic API key). It clones this repo and uses `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. Each run files the last 3 days' new halifax.ca releases as leads, then works up to 5 open leads and records its versions as `cloud-routine`. Its prompt and schedule live at claude.ai/code/routines. It needs, in its cloud environment:
+**The journalist** is a Claude Code cloud routine, "TalkHalifax journalist", that runs at five past every hour on the Claude plan (no Anthropic API key). It clones this repo and uses `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. Each run files the last 3 days' new halifax.ca releases as leads, then works up to 5 open leads and records its versions as `cloud-routine`. It then checks in on up to 5 developing stories that haven't had a check-in in 12 hours (`checkin_queue`, `record_checkin`). It re-reads each source and fixes only stale timing or facts the city changed. Its prompt and schedule live at claude.ai/code/routines. It needs, in its cloud environment:
 - an environment variable `TALKHALIFAX_TOKEN` set to the newsroom token
 - network access to `talkhalifax.alexwmmolloy.workers.dev`
 
 ## Not built yet
 
-Scheduled check-ins on developing stories (Phase 2), more sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
+More sources (Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
