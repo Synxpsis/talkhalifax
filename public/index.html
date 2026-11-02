@@ -111,8 +111,8 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 .more:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Home: today line + discussion list */
-/* Today card: the date, then weather, sunrise, sunset and high tide as labelled cells */
-.today { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); margin-bottom: 28px; border-radius: var(--radius-l); overflow: hidden; }
+/* Today card: the date, then weather, sunrise and sunset as labelled cells */
+.today { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); margin-bottom: 28px; border-radius: var(--radius-l); overflow: hidden; }
 .today > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 14px 18px; }
 .today > div + div { border-left: 1px solid var(--line); }
 .today .td-k { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
@@ -120,10 +120,11 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 .today .td-v { font-family: var(--f-mono); font-size: 16px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .today .td-s { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) {
-  .today { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .today .td-date { grid-column: 1 / -1; }
   .today > div + div { border-left: 0; border-top: 1px solid var(--line); }
-  .today > div:nth-child(odd):not(.td-date) { border-left: 1px solid var(--line); }
+  .today > div:nth-child(n+3) { border-left: 1px solid var(--line); }
+  .today > div { padding: 12px 14px; }
 }
 .forum-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
 .forum-top h1 { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; text-transform: uppercase; margin: 0; }
@@ -361,7 +362,7 @@ img { max-width: 100%; }
 .signout { margin-top: 22px; }
 /* Developing vs Articles */
 .live-h { display: flex; align-items: center; gap: 12px; }
-.live-h::after { content: "LIVE"; font-family: var(--f-mono); font-size: 12px; font-weight: 500; letter-spacing: .1em; color: var(--on-signal); background: var(--warn); border-radius: 999px; padding: 3px 9px 2px; }
+.live-h::after { content: "LIVE"; font-family: var(--f-mono); font-size: 13px; font-weight: 600; letter-spacing: .1em; color: var(--signal-warn); }
 .section-gap { margin-top: 44px; }
 .sect-title { font-family: var(--f-display); font-weight: 800; font-size: 32px; line-height: 1; text-transform: uppercase; margin: 0; }
 .card .upd { color: var(--warn); font-weight: 600; }
@@ -438,7 +439,7 @@ img { max-width: 100%; }
   <section class="view wrap" id="home">
     <section class="today glass" id="todayLine" aria-label="Today in Halifax"></section>
     <div class="forum-top">
-      <h1 class="live-h">Developing</h1>
+      <h1 class="live-h">Developing Stories</h1>
     </div>
     <p class="forum-lede">Stories the newsroom is still following. Claude updates them as news comes in, and each one has a live chat.</p>
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>

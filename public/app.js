@@ -49,7 +49,6 @@
   // ---------- Home ----------
   function renderToday() {
     const w = S.weather, c = (w && w.current) || {};
-    const hi = w && (w.tides || []).find(t => t.kind === "high" && new Date(t.at) > Date.now());
     const dash = w ? "–" : "…"; // "…" while loading, "–" when the source has no figure
     const cond = c.condition ? c.condition[0].toUpperCase() + c.condition.slice(1).toLowerCase() : "";
     const cell = (k, v, s = "") => `<div><span class="td-k">${k}</span><span class="td-v">${v}</span>${s ? `<span class="td-s">${esc(s)}</span>` : ""}</div>`;
@@ -57,8 +56,7 @@
       `<div class="td-date"><span class="td-k">${esc(fmt({ weekday: "long" }).format(new Date()))}</span><b>${esc(fmt({ month: "long", day: "numeric" }).format(new Date()))}</b></div>`
       + cell("Weather", c.tempC != null ? `${Math.round(c.tempC)}°C` : dash, cond)
       + cell("Sunrise", w && w.sunrise ? hm(w.sunrise) : dash)
-      + cell("Sunset", w && w.sunset ? hm(w.sunset) : dash)
-      + cell("High tide", hi ? hm(hi.at) : dash, hi && hi.m != null ? `${hi.m} m` : "");
+      + cell("Sunset", w && w.sunset ? hm(w.sunset) : dash);
   }
 
   /** Banners pinned under the header on Home: weather warnings, then city notices, then watches and statements. */
