@@ -33,6 +33,8 @@
   --signal-warn-wash: rgba(179, 38, 30, 0.07);
   --signal-caution: #8a5a00;
   --signal-ok: #1d6a86;
+  --banner-warn: #fbeceb;     /* solid band behind a city notice or weather warning */
+  --banner-caution: #f7f0e3;  /* solid band behind a weather watch or statement */
   --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(18, 20, 23, 0.04), 0 8px 24px rgba(18, 20, 23, 0.06);
   --focus: var(--ink);
   --splash: var(--ink);   /* your colour splash: points at ink until you choose one */
@@ -79,6 +81,8 @@
     --signal-warn-wash: rgba(242, 164, 158, 0.10);
     --signal-caution: #e8be6a;
     --signal-ok: #8ecbe0;
+    --banner-warn: #3a2422;
+    --banner-caution: #332b1b;
     --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.35);
   }
 }
@@ -134,10 +138,26 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 @media (min-width: 760px) { .card.lead { grid-column: span 2; } }
 .card.lead .tt { font-family: var(--f-display); font-weight: 800; font-size: 34px; line-height: 1.02; letter-spacing: .005em; }
 .card.lead .dk { font-size: 16px; -webkit-line-clamp: 3; }
-.card.notice { grid-column: 1 / -1; background: var(--notice-glass); flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 14px 18px; }
-.card.notice .k { color: var(--warn); }
-.card.notice .tt { font-size: 15.5px; font-weight: 600; flex: 1 1 280px; }
-.card.notice .ft { margin: 0; padding: 0; }
+/* Alert banners: city notices and weather warnings, pinned under the header on Home. Solid bands, not glass. */
+.abars { display: flex; flex-direction: column; }
+.abar { background: var(--banner-warn); border-top: 1px solid var(--line); }
+.abar.caution { background: var(--banner-caution); }
+header .abar-row { display: flex; flex-wrap: nowrap; align-items: center; justify-content: normal; gap: 8px; padding-block: 0; }
+.abar-in { flex: 1 1 auto; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; display: flex; align-items: center; gap: 4px 12px; min-height: 44px; padding-block: 8px; }
+.abar-tog { all: unset; box-sizing: border-box; flex: none; cursor: pointer; min-height: 44px; padding: 0 0 0 12px; border-left: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.abar-tog:hover { color: var(--ink); }
+.abar-tog:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.abar-in:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.abar-in:hover .abar-t { text-decoration: underline; text-underline-offset: 3px; }
+.abar-k { flex: none; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--signal-warn); }
+.abar.caution .abar-k { color: var(--signal-caution); }
+.abar-t { flex: 1 1 auto; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.abar-m { flex: none; font-size: 13px; color: var(--ink-muted); }
+@media (max-width: 560px) {
+  .abar-in { flex-wrap: wrap; align-items: baseline; padding-block: 10px; }
+  .abar-t { flex-basis: 100%; order: 3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .abar-m { margin-left: auto; }
+}
 /* Pull to refresh (home-screen app only): slides out from under the header */
 .ptr { position: fixed; z-index: 8; left: 50%; top: calc(env(safe-area-inset-top, 0px) + var(--hdr, 64px) + 6px); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); opacity: 0; pointer-events: none; transform: translate(-50%, -52px); transition: transform .2s ease, opacity .2s ease; }
 .ptr.drag { transition: none; }
@@ -149,7 +169,6 @@ header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-cont
 .alerts { list-style: none; margin: 0; padding: 0; }
 .alerts li { display: grid; grid-template-columns: 10.5em 1fr; gap: 2px 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
 .alerts .ac { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
-.alerts .ac.weather { color: var(--warn); }
 .alerts a { font-size: 15px; font-weight: 500; color: var(--ink); text-decoration: none; }
 .alerts a:hover { text-decoration: underline; }
 .alerts .ad { grid-column: 2; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
@@ -409,6 +428,7 @@ img { max-width: 100%; }
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
   </div>
+  <div class="abars" id="abars" role="region" aria-label="City notices and weather warnings" hidden></div>
 </header>
 
 <main>
@@ -423,7 +443,7 @@ img { max-width: 100%; }
     <div class="forum-top section-gap">
       <h2 class="sect-title">Getting around</h2>
     </div>
-    <p class="forum-lede">Road work, transit detours and weather warnings, as the city and Environment Canada post them.</p>
+    <p class="forum-lede">Road work and transit detours, as the city posts them.</p>
     <div id="alerts"><div class="msg">Loading…</div></div>
 
     <div class="forum-top section-gap">

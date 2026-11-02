@@ -60,16 +60,47 @@
     $("#todayLine").innerHTML = bits.join("");
   }
 
-  /** Getting around: official road, transit and weather notices, linked to their source. */
-  const ALERT_ORDER = { Weather: 0, Roads: 1, "Windsor Street Exchange": 2, Transit: 3 };
+  /** Banners pinned under the header on Home: weather warnings, then city notices, then watches and statements. */
+  function renderBanners() {
+    const el = $("#abars");
+    const t = x => (x ? new Date(x).getTime() : 0);
+    const items = [];
+    for (const a of (S.alerts && S.alerts.items) || []) {
+      if (a.cat !== "Weather") continue;
+      const warn = a.kind === "Warning";
+      const until = t(a.until) ? `Until ${shortDate(a.until)}, ${hm(a.until)}` : "";
+      items.push({ rank: warn ? 0 : a.kind === "Watch" ? 2 : 3, sev: warn ? "" : " caution", label: `Weather · ${a.kind}`,
+        title: a.title, meta: until, at: t(a.publishedAt), link: `href="${esc(a.url)}" target="_blank" rel="noopener"` });
+    }
+    for (const n of S.stories || []) {
+      if (n.kind !== "notice" || n.supersededBy || Date.now() - t(n.publishedAt) >= 7 * 864e5) continue;
+      items.push({ rank: 1, sev: "", label: "City notice" + (n.statusLabel ? " · " + n.statusLabel : ""),
+        title: n.headline, meta: shortDate(n.publishedAt), at: t(n.publishedAt), link: `href="#article-${esc(n.id)}" data-article="${esc(n.id)}"` });
+    }
+    items.sort((a, b) => a.rank - b.rank || b.at - a.at);
+    el.hidden = S.current !== "home" || !items.length;
+    if (el.hidden) { el.innerHTML = ""; return; }
+    const shown = S.allBanners ? items : items.slice(0, 1);
+    // The first banner carries the toggle for the rest, so a stack costs no extra row when collapsed
+    const toggle = items.length > 1 ? `<button type="button" class="abar-tog" id="abarMore" aria-expanded="${!!S.allBanners}">${S.allBanners ? "Less" : `+${items.length - 1} more`}</button>` : "";
+    el.innerHTML = shown.map((b, i) => `<div class="abar${b.sev}"><div class="wrap abar-row"><a class="abar-in" ${b.link}>
+        <span class="abar-k">${esc(b.label)}</span><span class="abar-t">${esc(b.title)}</span>${b.meta ? `<span class="abar-m">${esc(b.meta)}</span>` : ""}
+      </a>${i === 0 ? toggle : ""}</div></div>`).join("");
+    const more = $("#abarMore");
+    if (more) more.onclick = () => { S.allBanners = !S.allBanners; renderBanners(); };
+  }
+
+  /** Getting around: official road and transit notices, linked to their source. Weather warnings are in the banners. */
+  const ALERT_ORDER = { Roads: 1, "Windsor Street Exchange": 2, Transit: 3 };
   function renderAlerts() {
+    renderBanners();
     const el = $("#alerts");
     if (!S.alerts) { el.innerHTML = `<div class="msg">${S.offline ? "Road and transit notices aren't available right now." : "Loading…"}</div>`; return; }
-    const items = S.alerts.items.slice().sort((a, b) => (ALERT_ORDER[a.cat] - ALERT_ORDER[b.cat]) || String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
-    if (!items.length) { el.innerHTML = '<div class="msg">No road, transit or weather notices right now.</div>'; return; }
+    const items = S.alerts.items.filter(a => a.cat !== "Weather").sort((a, b) => (ALERT_ORDER[a.cat] - ALERT_ORDER[b.cat]) || String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
+    if (!items.length) { el.innerHTML = '<div class="msg">No road or transit notices right now.</div>'; return; }
     const shown = S.allAlerts ? items : items.slice(0, 6);
     el.innerHTML = `<ul class="alerts">${shown.map(a => `<li>
-        <span class="ac${a.cat === "Weather" ? " weather" : ""}">${esc(a.cat === "Windsor Street Exchange" ? "Windsor St. Exch." : a.cat)} · ${esc(a.kind)}</span>
+        <span class="ac">${esc(a.cat === "Windsor Street Exchange" ? "Windsor St. Exch." : a.cat)} · ${esc(a.kind)}</span>
         <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
         ${a.detail || a.until ? `<span class="ad">${a.until ? `Until ${esc(a.until)}. ` : ""}${esc(a.detail)}</span>` : ""}
       </li>`).join("")}</ul>` + (items.length > shown.length ? `<button type="button" class="alerts-more" id="alertsMore">Show all ${items.length}</button>` : "");
@@ -88,15 +119,11 @@
     }
     const t = x => (x ? new Date(x).getTime() : 0);
 
-    // ---- Developing: city notices first, then live stories by latest activity ----
-    const notices = S.stories.filter(x => x.kind === "notice" && !x.supersededBy && Date.now() - t(x.publishedAt) < 7 * 864e5).slice(0, 2);
+    renderBanners(); // city notices live in the banners now
+    // ---- Developing: live stories by latest activity ----
     const dev = S.stories.filter(x => x.kind === "article" && x.stage === "developing")
       .sort((a, b) => Math.max(t(b.lastUpdate), b.room.lastAt || 0, b.room.here ? Date.now() : 0, t(b.developingSince))
                     - Math.max(t(a.lastUpdate), a.room.lastAt || 0, a.room.here ? Date.now() : 0, t(a.developingSince)));
-    const noticeCards = notices.map(n => `<button type="button" class="card glass notice" data-article="${esc(n.id)}">
-        <span class="k">City notice${n.statusLabel ? " · " + esc(n.statusLabel) : ""}</span>
-        <span class="tt">${esc(n.headline)}</span>
-        <span class="ft"><span>${shortDate(n.publishedAt)}</span></span></button>`).join("");
     const devCards = dev.map((x, i) => {
       const r = x.room;
       const recentUpdate = x.lastUpdate && Date.now() - t(x.lastUpdate) < 864e5;
@@ -111,7 +138,7 @@
         ${x.dek ? `<span class="dk">${esc(x.dek)}</span>` : ""}
         <span class="ft">${left}<span class="pill${r.messages || r.here ? "" : " zero"}">${right}</span></span></button>`;
     }).join("");
-    $("#devCards").innerHTML = noticeCards + devCards || '<div class="msg">Nothing developing right now. New stories appear here as the newsroom publishes them.</div>';
+    $("#devCards").innerHTML = devCards || '<div class="msg">Nothing developing right now. New stories appear here as the newsroom publishes them.</div>';
 
     // ---- Articles: settled stories with threaded comments ----
     const key = {
@@ -664,6 +691,7 @@
     else if (v !== "profile") v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     S.current = v;
+    renderBanners(); // Home only
     $("#home").hidden = v !== "home";
     $("#profile").hidden = v !== "profile";
     $("#article").hidden = v !== "article";
