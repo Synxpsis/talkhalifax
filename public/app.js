@@ -37,6 +37,7 @@
 
   // ---------- People ----------
   const PERSON_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const VIEWER_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.8 21c.9-4.2 4.2-6.6 8.2-6.6s7.3 2.4 8.2 6.6z" fill="currentColor"/></svg>';
   const hue = id => { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 45% 45%)`; };
   /** A small round avatar: photo when there is one, otherwise an initial on a stable colour. */
   function avatar(p, cls = "av") {
@@ -120,15 +121,15 @@
       const r = x.room;
       const recentUpdate = x.lastUpdate && Date.now() - t(x.lastUpdate) < 864e5;
       const left = recentUpdate ? `<span class="upd">Updated ${hm(x.lastUpdate)}</span>`
-        : r.here ? `<span class="recent">● ${r.here} here now</span>`
         : r.lastAt ? `<span>Last message ${ago(r.lastAt)}${r.lastAuthor ? " from " + esc(r.lastAuthor) : ""}</span>`
         : `<span>${shortDate(x.publishedAt)}</span>`;
-      const right = r.here ? `${r.here} here` : `${r.messages} ${r.messages === 1 ? "message" : "messages"}`;
+      // Live viewer count: everyone with the story open right now, chatting or not
+      const viewers = `<span class="viewers${r.here ? " on" : ""}" aria-label="${r.here} ${r.here === 1 ? "person" : "people"} here now">${VIEWER_SVG}<b>${r.here}</b></span>`;
       return `<button type="button" class="card glass${i === 0 ? " lead" : ""}" data-article="${esc(x.id)}">
         <span class="k">${esc(x.area || x.section || "Halifax")}</span>
         <span class="tt">${esc(x.headline)}</span>
         ${x.dek ? `<span class="dk">${esc(x.dek)}</span>` : ""}
-        <span class="ft">${left}<span class="pill${r.messages || r.here ? "" : " zero"}">${right}</span></span></button>`;
+        <span class="ft">${left}${viewers}</span></button>`;
     }).join("");
     setCards($("#devCards"), devCards || '<div class="msg">Nothing developing right now. New stories appear here as the newsroom publishes them, and settled ones are in <a href="#articles" data-go="articles">Articles</a>.</div>');
   }

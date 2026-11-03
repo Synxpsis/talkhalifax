@@ -169,10 +169,11 @@ export class ArticleRoom extends DurableObject<Env> {
     const { here, readers } = this.here();
     const profiles = await this.profiles(here.map(h => h.id));
     this.broadcast({ t: "here", here, profiles, readers });
+    // Home's live counter: everyone with the story open, signed in or not
     await this.env.DB.prepare(
       `INSERT INTO room_stats (story_id, here_now, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(story_id) DO UPDATE SET here_now = excluded.here_now, updated_at = excluded.updated_at`,
-    ).bind(this.storyId, here.length, Date.now()).run();
+    ).bind(this.storyId, here.length + readers, Date.now()).run();
   }
 
   private async updateStats() {
