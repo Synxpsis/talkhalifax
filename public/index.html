@@ -376,6 +376,7 @@ img { max-width: 100%; }
 .dr-link[aria-current="page"] { background: var(--surface-sunken); }
 .dr-link .n { font-family: var(--f-mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--signal-warn); }
 .dr-x:focus-visible, .dr-link:focus-visible, .dr-who:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.drawer:focus, .dr-x:focus:not(:focus-visible), .dr-link:focus:not(:focus-visible), .dr-who:focus:not(:focus-visible) { outline: none; }
 .dr-foot { margin-top: auto; padding-top: 24px; font-size: 12.5px; color: var(--ink-muted); }
 @media (prefers-reduced-motion: no-preference) {
   .drawer[open] { animation: dr-in .28s cubic-bezier(.2, .7, .2, 1); }
@@ -450,6 +451,30 @@ img { max-width: 100%; }
 .auth-form .btn { margin-top: 14px; }
 .auth-form .btn:disabled { opacity: .5; cursor: default; }
 .auth-err { color: var(--warn); font-size: 14px; margin-top: 6px; }
+/* Notices: one card per notice, coloured by severity (urgent, disruption, info, resolved) */
+.nfilters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+.nfilters button { all: unset; box-sizing: border-box; cursor: pointer; min-height: 36px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--ink-muted); }
+.nfilters button:hover { color: var(--ink); }
+.nfilters button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface-page); }
+.nfilters button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.nfilters .c { font-family: var(--f-mono); font-size: 12px; font-weight: 500; opacity: .75; }
+.ncards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.ncard { --sev: var(--signal-ok); all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 14px; border-radius: var(--radius-l);
+  background: color-mix(in srgb, var(--sev) 12%, var(--surface-page)); border: 1px solid color-mix(in srgb, var(--sev) 18%, transparent); }
+.ncard:hover { background: color-mix(in srgb, var(--sev) 17%, var(--surface-page)); }
+.ncard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ncard.urgent { --sev: var(--signal-warn); }
+.ncard.disruption { --sev: var(--signal-caution); }
+.ncard.info { --sev: var(--signal-ok); }
+.ncard.resolved { --sev: var(--ink-faint); }
+.ncard .nk { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sev); }
+.ncard.resolved .nk { color: var(--ink-muted); }
+.ncard .nk .st { font-weight: 600; letter-spacing: .04em; color: var(--ink-muted); }
+.ncard .tt { font-weight: 600; font-size: 16.5px; line-height: 1.3; letter-spacing: -.01em; text-wrap: pretty; }
+.ncard.resolved .tt { color: var(--ink-muted); }
+.ncard .dk { font-size: 14px; color: var(--muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ncard .ft { margin-top: auto; padding-top: 4px; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+.n-sub { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 34px 0 12px; }
 </style>
 </head>
 <body>
@@ -459,6 +484,7 @@ img { max-width: 100%; }
     <nav class="hnav" aria-label="Sections">
       <button type="button" data-go="home">Developing Stories</button>
       <button type="button" data-go="articles">Articles</button>
+      <button type="button" data-go="notices">Notices</button>
     </nav>
     <button class="me-btn" type="button" id="meBtn" aria-label="Your profile">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -489,13 +515,24 @@ img { max-width: 100%; }
     <p class="forum-foot">Written by AI from official halifax.ca releases, each with a link to the original. City notices about fires, emergencies and water advisories stick to the facts and have chat and comments turned off.</p>
   </section>
 
+  <section class="view wrap" id="notices" hidden>
+    <div class="forum-top">
+      <h1>Notices</h1>
+    </div>
+    <div class="nfilters" role="group" aria-label="Show notices about" id="nFilters"></div>
+    <div class="ncards" id="nActive"><div class="msg">Loading…</div></div>
+    <h2 class="n-sub" id="nEarlierH" hidden>Earlier</h2>
+    <div class="ncards" id="nEarlier"></div>
+    <p class="forum-foot">City notices are restated from official releases, facts only, with chat turned off. Weather alerts come from Environment and Climate Change Canada.</p>
+  </section>
+
   <section class="view wrap" id="article" hidden></section>
 
   <section class="view wrap" id="profile" hidden></section>
 
 </main>
 
-<dialog class="drawer" id="navDrawer" aria-label="Menu"></dialog>
+<dialog class="drawer" id="navDrawer" aria-label="Menu" tabindex="-1"></dialog>
 
 <footer>
   <div class="wrap">

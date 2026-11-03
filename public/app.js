@@ -47,21 +47,23 @@
   const nameOf = uid => uid === (S.me && S.me.id) ? "You" : (room.profiles[uid] && room.profiles[uid].name) || "Someone";
 
   // ---------- Home ----------
-  /** Banners pinned under the header on Home: weather warnings, then city notices, then watches and statements. */
+  /** Banners pinned under the header on Home, for urgent things only: weather warnings, then urgent city notices.
+   *  Everything else is on the Notices page. */
   function renderBanners() {
     const el = $("#abars");
     const t = x => (x ? new Date(x).getTime() : 0);
     const items = [];
     for (const a of (S.alerts && S.alerts.items) || []) {
-      if (a.cat !== "Weather") continue;
-      const warn = a.kind === "Warning";
+      if (a.cat !== "Weather" || a.kind !== "Warning") continue;
       const until = t(a.until) ? `Until ${shortDate(a.until)}, ${hm(a.until)}` : "";
-      items.push({ rank: warn ? 0 : a.kind === "Watch" ? 2 : 3, sev: warn ? "" : " caution", label: `Weather · ${a.kind}`,
+      items.push({ rank: 0, sev: "", label: "Weather · Warning",
         title: a.title, meta: until, at: t(a.publishedAt), link: `href="${esc(a.url)}" target="_blank" rel="noopener"` });
     }
     for (const n of S.stories || []) {
-      if (n.kind !== "notice" || n.supersededBy || Date.now() - t(n.publishedAt) >= 7 * 864e5) continue;
-      items.push({ rank: 1, sev: "", label: "City notice" + (n.statusLabel ? " · " + n.statusLabel : ""),
+      if (n.kind !== "notice" || Date.now() - t(n.publishedAt) >= 7 * 864e5) continue;
+      const type = noticeType(n);
+      if (noticeSeverity(n, type) !== "urgent") continue;
+      items.push({ rank: 1, sev: "", label: type + (n.statusLabel ? " · " + n.statusLabel : ""),
         title: n.headline, meta: shortDate(n.publishedAt), at: t(n.publishedAt), link: `href="#article-${esc(n.id)}" data-article="${esc(n.id)}"` });
     }
     items.sort((a, b) => a.rank - b.rank || b.at - a.at);
@@ -153,6 +155,72 @@
   }
   document.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { S.sort = b.dataset.sort; renderArticles(); }));
 
+  // ---------- Notices: city notices and weather alerts, coloured by severity ----------
+  const N_TYPES = ["Emergency", "Police", "Roads", "Water", "Transit", "Winter", "Weather", "City"];
+  /** What a city notice is about, from its section and headline. */
+  function noticeType(n) {
+    const s = (n.section || "").toLowerCase(), h = (n.headline || "").toLowerCase();
+    if (/fire|emergenc/.test(s) || /\b(fire|evacuat|emergency|hazmat|shelter in place)/.test(h)) return "Emergency";
+    if (/police/.test(s) || /\b(police|rcmp|homicide|arrest|charged|missing (person|man|woman|youth|boy|girl))/.test(h)) return "Police";
+    if (/winter/.test(s) || /parking ban|snow|plow/.test(h)) return "Winter";
+    if (/water/.test(s) || /boil[- ]water|water main|water service/.test(h)) return "Water";
+    if (/transit/.test(s) || /\b(ferry|bus|transit)\b/.test(h)) return "Transit";
+    if (/road|transportation/.test(s) || /traffic|road|lane|highway|detour|bridge|street|drive/.test(h)) return "Roads";
+    return "City";
+  }
+  const RESOLVED = /\b(lifted|final update|resolved|reopened|located|cancell?ed|ended|over)\b/i;
+  /** urgent (safety), disruption (getting around, water), info, or resolved */
+  function noticeSeverity(n, type) {
+    if (n.supersededBy || RESOLVED.test(n.statusLabel || "") || RESOLVED.test(n.headline || "")) return "resolved";
+    if (type === "Emergency" || /boil[- ]water|missing|evacuat|shelter in place/i.test(n.headline || "")) return "urgent";
+    if (["Roads", "Water", "Transit", "Winter"].includes(type)) return "disruption";
+    return "info";
+  }
+  const SEV_RANK = { urgent: 0, disruption: 1, info: 2, resolved: 3 };
+  /** Every notice as one shape: city notices from the newsroom, weather alerts from ECCC. */
+  function allNotices() {
+    const out = [];
+    for (const n of S.stories || []) {
+      if (n.kind !== "notice") continue;
+      const type = noticeType(n), sev = noticeSeverity(n, type);
+      out.push({ id: n.id, type, sev, status: n.statusLabel, title: n.headline, dek: n.dek, area: n.area, at: tms(n.publishedAt),
+        old: sev === "resolved" || Date.now() - tms(n.publishedAt) > 7 * 864e5, link: `data-article="${esc(n.id)}"` });
+    }
+    for (const a of (S.alerts && S.alerts.items) || []) {
+      if (a.cat !== "Weather") continue;
+      out.push({ id: "w:" + a.title, type: "Weather", sev: a.kind === "Warning" ? "urgent" : a.kind === "Watch" ? "disruption" : "info",
+        status: a.kind, title: a.title, dek: a.detail, area: "", at: tms(a.publishedAt), old: false,
+        until: a.until, link: `href="${esc(a.url)}" target="_blank" rel="noopener"` });
+    }
+    return out;
+  }
+  function noticeCard(n) {
+    const tag = n.link.startsWith("href") ? "a" : "button";
+    return `<${tag} ${tag === "button" ? 'type="button" ' : ""}class="ncard ${n.sev}" ${n.link}>
+      <span class="nk">${esc(n.type)}${n.status ? `<span class="st">${esc(n.status)}</span>` : ""}</span>
+      <span class="tt">${esc(n.title)}</span>
+      ${n.dek ? `<span class="dk">${esc(n.dek)}</span>` : ""}
+      <span class="ft"><span>${n.until ? `Until ${shortDate(n.until)}, ${hm(n.until)}` : n.at ? shortDate(n.at) + ", " + hm(n.at) : ""}</span><span>${esc(n.area || "")}</span></span>
+    </${tag}>`;
+  }
+  function renderNotices() {
+    if (!S.stories) { $("#nActive").innerHTML = loadingMsg(); return; }
+    const all = allNotices(), f = S.nFilter || "All";
+    const active = all.filter(n => !n.old);
+    const types = N_TYPES.filter(t => all.some(n => n.type === t));
+    $("#nFilters").innerHTML = ["All", ...types].map(t => {
+      const c = t === "All" ? active.length : active.filter(n => n.type === t).length;
+      return `<button type="button" data-nf="${t}" aria-pressed="${t === f}">${t}${c ? `<span class="c">${c}</span>` : ""}</button>`;
+    }).join("");
+    const shown = all.filter(n => f === "All" || n.type === f);
+    const now = shown.filter(n => !n.old).sort((a, b) => SEV_RANK[a.sev] - SEV_RANK[b.sev] || b.at - a.at);
+    const earlier = shown.filter(n => n.old).sort((a, b) => b.at - a.at).slice(0, 24);
+    $("#nActive").innerHTML = now.map(noticeCard).join("") || `<div class="msg">No current ${f === "All" ? "" : f.toLowerCase() + " "}notices.</div>`;
+    $("#nEarlierH").hidden = !earlier.length;
+    $("#nEarlier").innerHTML = earlier.map(noticeCard).join("");
+  }
+  $("#nFilters").addEventListener("click", e => { const b = e.target.closest("[data-nf]"); if (b) { S.nFilter = b.dataset.nf; renderNotices(); } });
+
   // ---------- Article room ----------
   const narrow = () => window.matchMedia("(max-width: 960px)").matches;
   let chatOpen = false;
@@ -178,8 +246,9 @@
   }
   window.addEventListener("resize", applyChatState);
 
-  /** Back to the list the story lives in: Articles for settled ones, Developing Stories for the rest. */
-  const back = a => a && a.kind === "article" && a.stage === "archived"
+  /** Back to the list the story lives in: Notices, Articles for settled ones, Developing Stories for the rest. */
+  const back = a => a && a.kind === "notice" ? `<button type="button" class="back" data-go="notices">← Notices</button>`
+    : a && a.kind === "article" && a.stage === "archived"
     ? `<button type="button" class="back" data-go="articles">← Articles</button>`
     : `<button type="button" class="back" data-go="home">← Developing Stories</button>`;
 
@@ -691,6 +760,7 @@
   const drawer = $("#navDrawer");
   function renderDrawer() {
     const live = (S.stories || []).filter(x => x.kind === "article" && x.stage === "developing").length;
+    const urgent = allNotices().filter(n => !n.old && n.sev === "urgent").length;
     const here = v => S.current === v ? ' aria-current="page"' : "";
     const who = S.me
       ? `${avatar({ id: S.me.id, name: S.me.name, avatar: S.me.avatarUrl })}<span><b>${esc(S.me.name || "You")}</b><small>${S.me.role === "moderator" ? "Moderator · " : ""}Your profile</small></span>`
@@ -703,8 +773,9 @@
       <nav class="dr-nav" aria-label="Sections">
         <button type="button" class="dr-link" data-go="home"${here("home")}>Developing Stories${live ? `<span class="n">${live} LIVE</span>` : ""}</button>
         <button type="button" class="dr-link" data-go="articles"${here("articles")}>Articles</button>
+        <button type="button" class="dr-link" data-go="notices"${here("notices")}>Notices${urgent ? `<span class="n">${urgent} URGENT</span>` : ""}</button>
       </nav>
-      <p class="dr-foot">Written by AI from official halifax.ca releases.</p>
+      <p class="dr-foot">Written by AI from official releases.</p>
     </div>`;
     $("#drClose").onclick = closeDrawer;
   }
@@ -712,6 +783,8 @@
     renderDrawer();
     drawer.classList.remove("closing");
     drawer.showModal();
+    // showModal focuses the first button, which iOS outlines; start focus on the panel itself instead
+    drawer.focus();
     $("#meBtn").setAttribute("aria-expanded", "true");
   }
   function closeDrawer() {
@@ -727,7 +800,7 @@
   $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
 
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
-  const VIEWS = ["home", "articles", "profile"];
+  const VIEWS = ["home", "articles", "notices", "profile"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (!VIEWS.includes(v)) v = "home";
@@ -739,7 +812,7 @@
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + (v === "article" ? "article-" + S.article : v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
@@ -757,6 +830,7 @@
   async function refreshView() {
     if (S.current === "home") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "articles") return loadStories();
+    if (S.current === "notices") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "profile") return loadMe();
     const id = S.article, before = S.full[id];
     let a;
@@ -829,11 +903,11 @@
   async function loadStories() {
     try { S.stories = (await getJSON("/api/stories")).stories; S.offline = false; }
     catch (e) { S.offline = !S.stories; }
-    if (S.current === "home") renderHome(); else if (S.current === "articles") renderArticles();
+    if (S.current === "home") renderHome(); else if (S.current === "articles") renderArticles(); else if (S.current === "notices") renderNotices();
   }
   async function loadAlerts() {
     try { S.alerts = (await getJSON("/api/alerts")).alerts || { items: [] }; } catch (e) {}
-    if (S.current === "home") renderBanners();
+    if (S.current === "home") renderBanners(); else if (S.current === "notices") renderNotices();
   }
   async function loadMe() {
     try { const d = await getJSON("/api/me"); S.me = d.user; S.providers = d.providers; } catch (e) {}
@@ -845,6 +919,6 @@
   show(location.hash.slice(1) || "home");
   Promise.all([loadMe(), loadStories(), loadAlerts()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible
-  setInterval(() => { if (!document.hidden && (S.current === "home" || S.current === "articles")) loadStories(); }, 20000);
+  setInterval(() => { if (!document.hidden && (S.current === "home" || S.current === "articles" || S.current === "notices")) loadStories(); }, 20000);
   setInterval(() => { if (!document.hidden) loadAlerts(); }, 10 * 60000);
 })();
