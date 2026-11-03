@@ -9,7 +9,7 @@
 //       "note" (what changed, shown to readers on updates) and "reopen" (true brings an Article back to Developing).
 //       For an update, include only the fields that change.
 //   node scripts/newsroom.mjs tool <name> [json | @file.json]
-//       Calls one newsroom MCP tool (scan_sources, read_release, get_guidelines, list_leads, claim_lead, publish_story,
+//       Calls one newsroom MCP tool (scan_sources, conditions, trending, read_release, get_guidelines, list_leads, claim_lead, publish_story,
 //       update_story, …) and prints its result. For agents that can't connect to /mcp directly. `tool list` names them.
 //   node scripts/newsroom.mjs wait-review <id>
 //       Waits (up to 9 minutes per run) for the editor to approve or discard a draft (story id) or a held update

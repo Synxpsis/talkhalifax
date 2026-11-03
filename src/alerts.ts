@@ -113,7 +113,7 @@ async function transit(today: ReturnType<typeof halifaxToday>): Promise<Alert[]>
   return out;
 }
 
-async function weatherWarnings(): Promise<Alert[]> {
+export async function weatherWarnings(): Promise<Alert[]> {
   const p = JSON.parse(await get(ECCC)).features[0].properties;
   const out: Alert[] = [];
   for (const w of p.warnings || []) {
