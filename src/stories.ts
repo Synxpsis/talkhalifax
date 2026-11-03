@@ -1,5 +1,5 @@
 import { Env, User, json, randomId } from "./env";
-import { approvalOn, sendDraft } from "./telegram";
+import { approvalOn, sendDraft, sendUpdate } from "./telegram";
 
 // ---------- When a developing story moves down to Articles ----------
 // All of these must hold, or it has been developing longer than MAX_DEVELOPING.
@@ -75,7 +75,7 @@ export class NewsroomError extends Error {}
 
 /** Create a story (developing, or a draft held for review) or update an existing one. Shared by the REST endpoint and the MCP tools. */
 export async function saveStory(env: Env, id: string, input: Record<string, unknown>,
-  opts: { mode: "create" | "update" | "upsert"; review?: boolean; author?: string } = { mode: "upsert" }) {
+  opts: { mode: "create" | "update" | "upsert"; review?: boolean; author?: string; approved?: boolean } = { mode: "upsert" }) {
   if (!/^[A-Za-z0-9_.~-]{1,200}$/.test(id)) throw new NewsroomError("Story ids use letters, numbers, dots, dashes, underscores and tildes (up to 200).");
   const note = String(input.note ?? "").slice(0, 300);
   const author = (opts.author || "").slice(0, 60);
@@ -108,6 +108,14 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
   if (opts.mode === "create") throw new NewsroomError(`A story with id ${id} already exists (stage: ${existing.stage}). Use update_story to change it.`);
   if (existing.stage === "discarded") throw new NewsroomError("That story was discarded by a moderator and can't be changed.");
   if (!Object.keys(cols).length && input.reopen !== true) throw new NewsroomError("Nothing to change: pass at least one field.");
+  // Once the editor's Telegram is set up, changes to published stories wait for approval too (drafts have no readers yet)
+  if (!opts.approved && existing.stage !== "draft" && approvalOn(env)) {
+    const r = await env.DB.prepare("INSERT INTO pending_updates (story_id, input, author, created_at) VALUES (?, ?, ?, ?)")
+      .bind(id, JSON.stringify(input), author, Date.now()).run();
+    const n = Number(r.meta.last_row_id), ref = `u${n}`;
+    return { id, pending: ref, stage: existing.stage, telegram: await sendUpdate(env, n),
+      next: `Waiting for the editor's approval. Call await_review with id "${ref}" until it's approved or discarded.` };
+  }
   const sets = Object.keys(cols).map(n => `${n} = ?`);
   const version = existing.version + 1;
   // An update to an archived article brings it back to Developing, chat and all
@@ -162,6 +170,17 @@ export async function reviewDraft(env: Env, id: string, action: "approve" | "dis
     ? await env.DB.prepare("UPDATE stories SET stage = 'developing', developing_since = ?, updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, now, id).run()
     : await env.DB.prepare("UPDATE stories SET stage = 'discarded', updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, id).run();
   return !!res.meta.changes;
+}
+
+/** The editor's decision on a held update. Claims it first, so a double tap can't apply it twice. */
+export async function reviewUpdate(env: Env, n: number, action: "approve" | "discard") {
+  const p = await env.DB.prepare("SELECT story_id, input, author FROM pending_updates WHERE n = ? AND status = 'waiting'").bind(n).first<{ story_id: string; input: string; author: string }>();
+  if (!p) return false;
+  const res = await env.DB.prepare("UPDATE pending_updates SET status = ?, decided_at = ? WHERE n = ? AND status = 'waiting'")
+    .bind(action === "approve" ? "approved" : "discarded", Date.now(), n).run();
+  if (!res.meta.changes) return false;
+  if (action === "approve") await saveStory(env, p.story_id, JSON.parse(p.input), { mode: "update", author: p.author, approved: true });
+  return true;
 }
 
 // ---------- Comments on Articles ----------

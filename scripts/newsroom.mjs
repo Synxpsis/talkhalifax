@@ -12,7 +12,8 @@
 //       Calls one newsroom MCP tool (scan_sources, read_release, get_guidelines, list_leads, claim_lead, publish_story,
 //       update_story, …) and prints its result. For agents that can't connect to /mcp directly. `tool list` names them.
 //   node scripts/newsroom.mjs wait-review <id>
-//       Waits (up to 9 minutes per run) for the editor to approve or discard a draft on Telegram, then prints
+//       Waits (up to 9 minutes per run) for the editor to approve or discard a draft (story id) or a held update
+//       (its pending id, e.g. u12) on Telegram, then prints
 //       approved, discarded, expired, or waiting (run it again).
 //
 // Site: TALKHALIFAX_URL (default https://talkhalifax.alexwmmolloy.workers.dev)
@@ -59,6 +60,8 @@ async function publish() {
   });
   const out = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`publish ${id} failed: ${r.status} ${out.error || ""}`);
+  if (out.pending) return console.log(`update to ${id} is waiting for the editor's approval: wait-review ${out.pending}`);
+  if (out.stage === "draft") return console.log(`created ${id} as a draft, waiting for the editor's approval: wait-review ${id}`);
   console.log(`${out.created ? "created" : "updated"} ${id} v${out.version}${out.reopened ? " (back to Developing)" : ""}`);
 }
 

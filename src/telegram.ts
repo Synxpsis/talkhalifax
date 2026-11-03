@@ -2,7 +2,7 @@
 // The bot's webhook (/telegram/webhook) handles the taps; the journalist waits on await_review meanwhile.
 // Secrets: TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_CHAT_ID (the editor's chat; the bot tells you it on /start).
 import { Env, json } from "./env";
-import { newsroomAuthorized, reviewDraft } from "./stories";
+import { newsroomAuthorized, reviewDraft, reviewUpdate } from "./stories";
 
 const SITE = "https://talkhalifax.alexwmmolloy.workers.dev";
 const html = (s: unknown) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
@@ -56,8 +56,48 @@ export async function sendDraft(env: Env, id: string): Promise<string> {
   try {
     await tg(env, "sendMessage", {
       chat_id: env.TELEGRAM_CHAT_ID, text: text.slice(0, 4096), parse_mode: "HTML", link_preview_options: { is_disabled: true },
-      reply_markup: { inline_keyboard: [[{ text: "✅ Approve and publish", callback_data: `ap:${s.n}` }, { text: "🗑 Discard", callback_data: `dc:${s.n}` }]] },
+      reply_markup: buttons(`ap:${s.n}`, `dc:${s.n}`),
     });
+    return "sent";
+  } catch (e) { return String((e as Error).message); }
+}
+
+const buttons = (approve: string, discard: string) =>
+  ({ inline_keyboard: [[{ text: "✅ Approve and publish", callback_data: approve }, { text: "🗑 Discard", callback_data: discard }]] });
+
+// How each change reads in the editor's message
+const LABELS: Record<string, string> = {
+  headline: "Headline", dek: "Dek", area: "Area", section: "Section", statusLabel: "Status", supersededBy: "Replaced by",
+  readMin: "Read time", reason: "Reason", source: "Source", publishedAt: "Published", kind: "Kind",
+};
+
+/** Send a held change to a published story to the editor. Returns "sent", or why it wasn't. */
+export async function sendUpdate(env: Env, n: number): Promise<string> {
+  if (!approvalOn(env)) return "Telegram isn't set up";
+  const p = await env.DB.prepare("SELECT p.story_id, p.input, s.headline, s.kind, s.stage FROM pending_updates p JOIN stories s ON s.id = p.story_id WHERE p.n = ?")
+    .bind(n).first<{ story_id: string; input: string; headline: string; kind: string; stage: string }>();
+  if (!p) return "no such update";
+  const c: Record<string, any> = JSON.parse(p.input);
+  const lines = [
+    `✏️ <b>Update to a ${p.stage === "archived" ? "story in Articles" : "live " + (p.kind === "notice" ? "notice" : "story")} waiting for your approval</b>`,
+    "",
+    `<b>${html(p.headline)}</b>`,
+    c.note ? `What changed: <i>${html(c.note)}</i>` : "",
+    c.reopen === true ? "↩️ Moves it back to Developing Stories, with a live chat" : "",
+    "",
+  ];
+  for (const [k, label] of Object.entries(LABELS)) if (c[k] !== undefined) lines.push(`<b>${label}:</b> ${html(c[k])}`);
+  if (Array.isArray(c.facts)) lines.push("", "<b>Facts</b>", ...c.facts.map((f: any) => `• <b>${html(f.k)}:</b> ${html(f.v)}`));
+  if (Array.isArray(c.means)) lines.push("", `<b>${p.kind === "notice" ? "What to do" : "What this means"}</b>`, ...c.means.map((m: string) => "• " + html(m)));
+  const body: string[] = Array.isArray(c.body) ? c.body : [];
+  let text = "";
+  for (let keep = body.length; keep >= 0; keep--) {
+    text = [...lines, ...(body.length ? ["", "<b>Text</b>", ...body.slice(0, keep).map(html), keep < body.length ? "…" : ""] : []), "", `<a href="${SITE}/#article-${encodeURIComponent(p.story_id)}">Current version</a>`]
+      .filter((l, i, a) => l || a[i - 1]).join("\n");
+    if (text.length <= 4000) break;
+  }
+  try {
+    await tg(env, "sendMessage", { chat_id: env.TELEGRAM_CHAT_ID, text: text.slice(0, 4096), parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: buttons(`up:${n}`, `ux:${n}`) });
     return "sent";
   } catch (e) { return String((e as Error).message); }
 }
@@ -89,14 +129,26 @@ export async function telegramWebhook(req: Request, env: Env, url: URL): Promise
 
   const cq = u.callback_query;
   if (cq) {
-    const m = String(cq.data || "").match(/^(ap|dc):(\d+)$/);
+    const m = String(cq.data || "").match(/^(ap|dc|up|ux):(\d+)$/);
     if (!m || !editor(cq.message?.chat?.id)) { await tg(env, "answerCallbackQuery", { callback_query_id: cq.id }); return json({ ok: true }); }
-    const s = await env.DB.prepare("SELECT id, headline, stage FROM stories WHERE rowid = ?").bind(Number(m[2])).first<{ id: string; headline: string; stage: string }>();
-    const approve = m[1] === "ap";
-    const done = !!s && await reviewDraft(env, s.id, approve ? "approve" : "discard");
-    const note = !s ? "That story no longer exists."
-      : !done ? `Already handled: this story is ${s.stage === "draft" ? "a draft" : s.stage === "discarded" ? "discarded" : "published"}.`
-      : approve ? `✅ Published: <a href="${SITE}/#article-${encodeURIComponent(s.id)}">${html(s.headline)}</a>` : `🗑 Discarded: ${html(s.headline)}`;
+    const approve = m[1] === "ap" || m[1] === "up", isUpdate = m[1] === "up" || m[1] === "ux";
+    let note: string | undefined, done = false;
+    if (isUpdate) {
+      // A change to a published story
+      const p = await env.DB.prepare("SELECT p.story_id AS id, p.status, s.headline FROM pending_updates p LEFT JOIN stories s ON s.id = p.story_id WHERE p.n = ?")
+        .bind(Number(m[2])).first<{ id: string; status: string; headline: string | null }>();
+      try { done = !!p && await reviewUpdate(env, Number(m[2]), approve ? "approve" : "discard"); }
+      catch (e) { note = `⚠️ Couldn't apply that update: ${html((e as Error).message)}`; }
+      note ??= !p || !p.headline ? "That story no longer exists."
+        : !done ? `Already handled: this update was ${p.status}.`
+        : approve ? `✅ Updated: <a href="${SITE}/#article-${encodeURIComponent(p.id)}">${html(p.headline)}</a>` : `🗑 Discarded the update to: ${html(p.headline)}`;
+    } else {
+      const s = await env.DB.prepare("SELECT id, headline, stage FROM stories WHERE rowid = ?").bind(Number(m[2])).first<{ id: string; headline: string; stage: string }>();
+      done = !!s && await reviewDraft(env, s.id, approve ? "approve" : "discard");
+      note = !s ? "That story no longer exists."
+        : !done ? `Already handled: this story is ${s.stage === "draft" ? "a draft" : s.stage === "discarded" ? "discarded" : "published"}.`
+        : approve ? `✅ Published: <a href="${SITE}/#article-${encodeURIComponent(s.id)}">${html(s.headline)}</a>` : `🗑 Discarded: ${html(s.headline)}`;
+    }
     await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: done ? (approve ? "Published" : "Discarded") : "Already handled" });
     await tg(env, "editMessageReplyMarkup", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {});
     await tg(env, "sendMessage", { chat_id: cq.message.chat.id, text: note, parse_mode: "HTML", reply_parameters: { message_id: cq.message.message_id } });

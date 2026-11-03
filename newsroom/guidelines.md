@@ -9,13 +9,20 @@ New articles start under Developing, with a live chat, and move to Articles on t
 Use `review: true` on `publish_story` for anything sensitive (police matters, health, people named in an incident):
 the story waits as a draft until a moderator approves it.
 
-Every new `article` also waits for the editor's approval: `publish_story` returns `stage: "draft"`, and the editor
-gets it on Telegram with Approve and Discard buttons. (Notices, skips and `update_story` changes publish at once.)
-Keep the lead claimed and stay in your run until the editor decides: call `await_review` with the story id (from a
-terminal, `node scripts/newsroom.mjs wait-review <id>`) and call it again while it answers `waiting`. Then close the lead:
-`approved` → `complete_lead` as published; `discarded` → dropped, with notes "Discarded by the editor";
-`expired` (no answer after 50 minutes) → published, with notes "Awaiting the editor's approval on Telegram". Don't
-re-publish or change a draft while you wait.
+The editor approves on Telegram, with Approve and Discard buttons:
+- Every new `article`: `publish_story` returns `stage: "draft"`. Wait with the story id.
+- Every `update_story` change to a published story (articles and notices, Developing or Articles, check-ins
+  included): it returns `pending` with an id like `"u12"`, and nothing changes on the site until the editor approves.
+  Wait with that pending id.
+(New notices and skips publish at once, unless you used `review: true`.)
+
+Keep the lead claimed and stay in your run until the editor decides: call `await_review` with the id (from a
+terminal, `node scripts/newsroom.mjs wait-review <id>`) and call it again while it answers `waiting`. Approving
+publishes the article or applies the update on the spot; you don't publish anything again. Then close the lead:
+`approved` → `complete_lead` as published (or updated); `discarded` → dropped, with notes "Discarded by the editor";
+`expired` (no answer after 50 minutes) → published (or updated), with notes "Awaiting the editor's approval on Telegram".
+For a check-in, record it as "updated" with the editor's decision in its notes. Don't re-publish, re-send or change
+anything while you wait: one pending update per story at a time.
 
 ## What to cover first
 
