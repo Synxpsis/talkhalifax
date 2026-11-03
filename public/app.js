@@ -25,7 +25,7 @@
   // ---------- State ----------
   const S = {
     me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, offline: false,
-    sort: "active", current: "home", article: null,
+    sort: "active", current: "home", article: null, user: null, userFrom: null, users: {},
   };
   const room = { ws: null, id: null, messages: [], profiles: {}, here: [], readers: 0, you: null, error: "", typing: false, armed: null, armedTimer: null, tries: 0, closing: false };
 
@@ -267,7 +267,7 @@
         <div class="kicker${isNotice ? " notice" : ""}">${isNotice ? "City notice" + (a.statusLabel ? " · " + esc(a.statusLabel) : "") : (developing ? "Developing · " : "") + esc(a.section) + " · " + esc(a.area || "Halifax")}</div>
         <h1>${esc(a.headline)}</h1>
         ${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
-        <div class="byline">${a.author ? `<span class="by">By <b>${esc(a.author.name)}</b>, AI journalist</span>` : ""}<span class="ai">${isNotice ? "Rewritten by AI from an official notice, facts only" : "Written by AI from an official release"}</span><span>${fullDate(a.publishedAt)}</span>${a.lastUpdate ? `<span>Updated ${fullDate(a.lastUpdate)}, ${hm(a.lastUpdate)}</span>` : ""}${a.readMin ? `<span>${a.readMin} min read</span>` : ""}</div>
+        <div class="byline">${a.author ? `<span class="by">By <button type="button" class="by-link" data-user="${esc(a.author.id)}">${esc(a.author.name)}</button>, AI journalist</span>` : ""}<span class="ai">${isNotice ? "Rewritten by AI from an official notice, facts only" : "Written by AI from an official release"}</span><span>${fullDate(a.publishedAt)}</span>${a.lastUpdate ? `<span>Updated ${fullDate(a.lastUpdate)}, ${hm(a.lastUpdate)}</span>` : ""}${a.readMin ? `<span>${a.readMin} min read</span>` : ""}</div>
         ${showUpdate ? `<div class="updated-banner"><b>Latest update</b> · ${esc(ago(a.lastUpdate))}: ${esc(a.updateNote)}</div>` : ""}
         ${newer ? `<button type="button" class="banner" data-article="${esc(newer.id)}"><b>There's a newer update.</b> <span>${esc(newer.headline)} →</span></button>` : ""}
         ${a.facts.length ? `<dl class="facts">${a.facts.map(f => `<dt>${esc(f.k)}</dt><dd>${linkify(f.v)}</dd>`).join("")}</dl>` : ""}
@@ -276,7 +276,7 @@
           ${a.means.length ? `<h2>${isNotice ? "What to do" : "What this means for you"}</h2><ul>${a.means.map(p => `<li>${linkify(p)}</li>`).join("")}</ul>` : ""}
         </div>
         <div class="source">Source: <a href="${esc(a.source)}" target="_blank" rel="noopener">original ${isNotice ? "notice" : "release"} on ${esc(hostOf(a.source))}</a>. Dates, times and places are copied from it; if anything differs, the original is right.</div>
-        ${a.author ? `<div class="author-card">${avatar({ id: a.author.id, name: a.author.name })}<div><b>${esc(a.author.name)}</b><p>${esc(a.author.bio)}</p></div></div>` : ""}
+        ${a.author ? `<button type="button" class="author-card" data-user="${esc(a.author.id)}" aria-label="${esc(a.author.name)}'s profile">${avatar({ id: a.author.id, name: a.author.name })}<span><b>${esc(a.author.name)}</b><span class="ac-bio">${esc(a.author.bio)}</span><span class="ac-more">See all of ${esc(a.author.name.split(" ")[0])}'s stories →</span></span></button>` : ""}
         ${mod ? `<div class="stage-tools">Moderator: <button type="button" id="stageBtn" data-stage="${developing ? "archived" : "developing"}">${developing ? "Move to Articles (closes and clears the chat)" : "Move back to Developing"}</button></div>` : ""}
       </article>`;
   }
@@ -669,6 +669,38 @@
     }
   }
 
+  /** Someone's public profile; for the newsroom's journalist, every story they wrote. */
+  async function renderUser() {
+    const v = $("#user"), id = S.user;
+    const backBtn = S.userFrom && S.userFrom.startsWith("article-")
+      ? `<button type="button" class="back" data-article="${esc(S.userFrom.slice(8))}">← Back to the story</button>` : back();
+    if (!S.users[id]) v.innerHTML = `<div class="profile">${backBtn}${loadingMsg()}</div>`;
+    let d = S.users[id];
+    try { d = S.users[id] = await getJSON("/api/users/" + encodeURIComponent(id)); }
+    catch (e) { if (!d) { if (S.current === "user" && S.user === id) v.innerHTML = `<div class="profile">${backBtn}<div class="msg">This profile isn't available.</div></div>`; return; } }
+    if (S.current !== "user" || S.user !== id) return;
+    const u = d.user, st = d.stories || [];
+    const live = st.filter(x => x.stage === "developing").length;
+    const stats = u.ai
+      ? [[st.length, st.length === 1 ? "story" : "stories"], [live, "developing now"], [st.filter(x => x.kind === "notice").length, "notices"]]
+      : [[d.stats.messages, d.stats.messages === 1 ? "message sent" : "messages sent"], [d.stats.rooms, d.stats.rooms === 1 ? "chat joined" : "chats joined"]];
+    v.innerHTML = `<div class="profile">${backBtn}
+      <div class="profile-card glass">
+        <div class="pic">${u.avatar ? `<img alt="" src="${esc(u.avatar)}" referrerpolicy="no-referrer">` : avatar({ id: u.id, name: u.name }, "av").replace('class="av"', 'class="av" style="width:100%;height:100%;font-size:32px;background:' + hue(u.id) + '"')}</div>
+        <div><h1>${esc(u.name || "Someone")}</h1><p>${u.ai ? "TalkHalifax journalist" : "Halifax"}${u.ai ? '<span class="role">AI</span>' : u.role === "moderator" ? '<span class="role">Moderator</span>' : ""}</p></div>
+      </div>
+      ${u.bio ? `<p class="u-bio">${esc(u.bio)}</p>` : ""}
+      <div class="stats">${stats.map(([n, l]) => `<div class="stat glass"><b>${n || 0}</b><span>${l}</span></div>`).join("")}</div>
+      ${u.ai ? `<h2 class="p-h">Stories by ${esc((u.name || "").split(" ")[0])}</h2>
+      <div class="cards">${st.map(x => `<button type="button" class="card glass${x.stage === "archived" ? " archived" : ""}" data-article="${esc(x.id)}">
+          <span class="k">${x.stage === "developing" ? "Developing · " : ""}${esc(x.kind === "notice" ? "Notice" : x.area || x.section || "Halifax")}</span>
+          <span class="tt">${esc(x.headline)}</span>
+          ${x.dek ? `<span class="dk">${esc(x.dek)}</span>` : ""}
+          <span class="ft"><span>${shortDate(x.publishedAt)}</span></span></button>`).join("") || '<div class="msg">No stories yet.</div>'}</div>` : ""}
+      <p class="p-note">${u.ai ? "An AI journalist: every story is written from an official release, and an editor approves articles before they publish." : `Joined ${shortDate(u.joined)}.`}</p>
+    </div>`;
+  }
+
   async function renderProfile() {
     const v = $("#profile");
     const backBtn = back();
@@ -804,26 +836,34 @@
   const VIEWS = ["home", "articles", "notices", "profile"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
+    else if (v.startsWith("user-")) {
+      const id = v.slice(5);
+      if (S.current !== "user" || S.user !== id) S.userFrom = S.current === "article" ? "article-" + S.article : S.current;
+      S.user = id; v = "user";
+    }
     else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     S.current = v;
     renderBanners(); // Home only
-    for (const id of [...VIEWS, "article"]) $("#" + id).hidden = v !== id;
+    for (const id of [...VIEWS, "article", "user"]) $("#" + id).hidden = v !== id;
     document.body.classList.toggle("wide-view", v === "article");
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-    try { history.replaceState(null, "", "#" + (v === "article" ? "article-" + S.article : v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
+    try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
+    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
+  const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v;
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-article]");
     if (a) { e.preventDefault(); return goTo("article-" + a.dataset.article); }
+    const p = e.target.closest("[data-user]");
+    if (p) { e.preventDefault(); return goTo("user-" + p.dataset.user); }
     const g = e.target.closest("[data-go]");
     if (g) { e.preventDefault(); goTo(g.dataset.go); }
   });
-  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== (S.current === "article" ? "article-" + S.article : S.current)) goTo(h); });
+  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (h !== hashOf(S.current)) goTo(h); });
 
   // ---------- Pull to refresh ----------
   // Home-screen web apps on iOS have no browser reload, so pulling down from the top refreshes the current view.
@@ -833,6 +873,7 @@
     if (S.current === "articles") return loadStories();
     if (S.current === "notices") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "profile") return loadMe();
+    if (S.current === "user") return renderUser();
     const id = S.article, before = S.full[id];
     let a;
     try { a = await fetchStory(id); } catch (e) { return; }
