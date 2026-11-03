@@ -47,18 +47,6 @@
   const nameOf = uid => uid === (S.me && S.me.id) ? "You" : (room.profiles[uid] && room.profiles[uid].name) || "Someone";
 
   // ---------- Home ----------
-  function renderToday() {
-    const w = S.weather, c = (w && w.current) || {};
-    const dash = w ? "–" : "…"; // "…" while loading, "–" when the source has no figure
-    const cond = c.condition ? c.condition[0].toUpperCase() + c.condition.slice(1).toLowerCase() : "";
-    const cell = (k, v, s = "") => `<div><span class="td-k">${k}</span><span class="td-v">${v}</span>${s ? `<span class="td-s">${esc(s)}</span>` : ""}</div>`;
-    $("#todayLine").innerHTML =
-      `<div class="td-date"><span class="td-k">${esc(fmt({ weekday: "long" }).format(new Date()))}</span><b>${esc(fmt({ month: "long", day: "numeric" }).format(new Date()))}</b></div>`
-      + cell("Weather", c.tempC != null ? `${Math.round(c.tempC)}°C` : dash, cond)
-      + cell("Sunrise", w && w.sunrise ? hm(w.sunrise) : dash)
-      + cell("Sunset", w && w.sunset ? hm(w.sunset) : dash);
-  }
-
   /** Banners pinned under the header on Home: weather warnings, then city notices, then watches and statements. */
   function renderBanners() {
     const el = $("#abars");
@@ -121,7 +109,6 @@
 
   /** Home is the developing stories, the most recently updated first. */
   function renderHome() {
-    renderToday();
     renderBanners(); // city notices live in the banners now
     if (!S.stories) { setCards($("#devCards"), loadingMsg()); return; }
     const t = tms;
@@ -196,6 +183,8 @@
     ? `<button type="button" class="back" data-go="articles">← Articles</button>`
     : `<button type="button" class="back" data-go="home">← Developing Stories</button>`;
 
+  const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "the source"; } };
+
   /** The article itself (shared by Developing and Articles views, and swapped in place on live updates). */
   function articleHTML(a) {
     const isNotice = a.kind === "notice";
@@ -208,7 +197,7 @@
         <div class="kicker${isNotice ? " notice" : ""}">${isNotice ? "City notice" + (a.statusLabel ? " · " + esc(a.statusLabel) : "") : (developing ? "Developing · " : "") + esc(a.section) + " · " + esc(a.area || "Halifax")}</div>
         <h1>${esc(a.headline)}</h1>
         ${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
-        <div class="byline"><span class="ai">${isNotice ? "Rewritten by AI from an official notice, facts only" : "Written by AI from an official release"}</span><span>${fullDate(a.publishedAt)}</span>${a.lastUpdate ? `<span>Updated ${fullDate(a.lastUpdate)}, ${hm(a.lastUpdate)}</span>` : ""}${a.readMin ? `<span>${a.readMin} min read</span>` : ""}</div>
+        <div class="byline">${a.author ? `<span class="by">By <b>${esc(a.author.name)}</b>, AI journalist</span>` : ""}<span class="ai">${isNotice ? "Rewritten by AI from an official notice, facts only" : "Written by AI from an official release"}</span><span>${fullDate(a.publishedAt)}</span>${a.lastUpdate ? `<span>Updated ${fullDate(a.lastUpdate)}, ${hm(a.lastUpdate)}</span>` : ""}${a.readMin ? `<span>${a.readMin} min read</span>` : ""}</div>
         ${showUpdate ? `<div class="updated-banner"><b>Latest update</b> · ${esc(ago(a.lastUpdate))}: ${esc(a.updateNote)}</div>` : ""}
         ${newer ? `<button type="button" class="banner" data-article="${esc(newer.id)}"><b>There's a newer update.</b> <span>${esc(newer.headline)} →</span></button>` : ""}
         ${a.facts.length ? `<dl class="facts">${a.facts.map(f => `<dt>${esc(f.k)}</dt><dd>${linkify(f.v)}</dd>`).join("")}</dl>` : ""}
@@ -216,7 +205,8 @@
           ${a.body.map(p => `<p>${linkify(p)}</p>`).join("")}
           ${a.means.length ? `<h2>${isNotice ? "What to do" : "What this means for you"}</h2><ul>${a.means.map(p => `<li>${linkify(p)}</li>`).join("")}</ul>` : ""}
         </div>
-        <div class="source">Source: <a href="${esc(a.source)}" target="_blank" rel="noopener">original ${isNotice ? "notice" : "release"} on halifax.ca</a>. Dates, times and places are copied from it; if anything differs, the original is right.</div>
+        <div class="source">Source: <a href="${esc(a.source)}" target="_blank" rel="noopener">original ${isNotice ? "notice" : "release"} on ${esc(hostOf(a.source))}</a>. Dates, times and places are copied from it; if anything differs, the original is right.</div>
+        ${a.author ? `<div class="author-card">${avatar({ id: a.author.id, name: a.author.name })}<div><b>${esc(a.author.name)}</b><p>${esc(a.author.bio)}</p></div></div>` : ""}
         ${mod ? `<div class="stage-tools">Moderator: <button type="button" id="stageBtn" data-stage="${developing ? "archived" : "developing"}">${developing ? "Move to Articles (closes and clears the chat)" : "Move back to Developing"}</button></div>` : ""}
       </article>`;
   }
@@ -765,7 +755,7 @@
   // Home-screen web apps on iOS have no browser reload, so pulling down from the top refreshes the current view.
   // In a normal browser tab the browser's own pull-to-refresh already does this, so it stays off there.
   async function refreshView() {
-    if (S.current === "home") return Promise.all([loadStories(), loadWeather(), loadAlerts()]);
+    if (S.current === "home") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "articles") return loadStories();
     if (S.current === "profile") return loadMe();
     const id = S.article, before = S.full[id];
@@ -841,9 +831,6 @@
     catch (e) { S.offline = !S.stories; }
     if (S.current === "home") renderHome(); else if (S.current === "articles") renderArticles();
   }
-  async function loadWeather() {
-    try { S.weather = (await getJSON("/api/weather")).weather; if (S.current === "home") renderToday(); } catch (e) {}
-  }
   async function loadAlerts() {
     try { S.alerts = (await getJSON("/api/alerts")).alerts || { items: [] }; } catch (e) {}
     if (S.current === "home") renderBanners();
@@ -856,9 +843,8 @@
   }
 
   show(location.hash.slice(1) || "home");
-  Promise.all([loadMe(), loadStories(), loadWeather(), loadAlerts()]);
+  Promise.all([loadMe(), loadStories(), loadAlerts()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible
   setInterval(() => { if (!document.hidden && (S.current === "home" || S.current === "articles")) loadStories(); }, 20000);
-  setInterval(() => { if (!document.hidden) { loadWeather(); loadAlerts(); } }, 10 * 60000);
-  setInterval(() => { if (S.current === "home" && !document.hidden) renderToday(); }, 60000);
+  setInterval(() => { if (!document.hidden) loadAlerts(); }, 10 * 60000);
 })();

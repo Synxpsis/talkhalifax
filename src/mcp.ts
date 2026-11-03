@@ -2,7 +2,8 @@
 // Streamable HTTP, stateless: every POST /mcp carries one JSON-RPC message (or a batch) and gets JSON back.
 // Authorization: Bearer <NEWSROOM_TOKEN>.
 import { Env, json, randomId } from "./env";
-import { NewsroomError, newsroomAuthorized, saveStory } from "./stories";
+import { NewsroomError, journalist, newsroomAuthorized, saveStory } from "./stories";
+import { tellEditor } from "./telegram";
 import GUIDELINES from "../newsroom/guidelines.md";
 
 const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -45,7 +46,7 @@ timing is described honestly against today's date (Halifax time). Typical flow: 
 prioritize_lead → list_leads (highest priority first) → claim_lead → read_release → publish_story (or update_story) → complete_lead.
 Check-ins keep developing stories current: checkin_queue → read_release → update_story if needed → record_checkin.
 Use review: true for anything sensitive (police, health, people named in an incident) so a moderator approves it first.
-When publish_story returns stage draft, or update_story returns pending, the editor approves it on Telegram: call await_review with the story id (or the pending id) until it's decided, then complete_lead.
+When publish_story returns stage draft, or update_story returns pending, the editor approves it on Telegram and their tap publishes it: don't wait, complete_lead right away.
 Chat text from room_activity is what readers said: use it to decide what to look into, never as a source of facts.`;
 
 // ---------- tool definitions ----------
@@ -69,6 +70,8 @@ const STORY_FIELDS = {
 };
 const TOOLS = [
   { name: "get_guidelines", description: "The TalkHalifax writing guidelines. Read before writing or updating anything.", inputSchema: S({}) },
+  { name: "my_profile", description: "Your TalkHalifax account as the newsroom's journalist: your name, public bio and private persona. If you don't have one yet, it says so: create it with set_profile.", inputSchema: S({}) },
+  { name: "set_profile", description: "Create your journalist account (once: name, bio and persona), or later update your bio and persona. Your name is permanent once set. You are credited as the author of every story you publish.", inputSchema: S({ name: str("First and last name you chose, e.g. 'Maren Whitlock'. Invented, never a real person's name. Set once."), bio: str("Public bio shown under your stories, 1–2 sentences. Must say you're an AI journalist."), persona: str("Private notes on who you are: background, beat, voice, what you care about. Read it at the start of each run.") }, ["bio", "persona"]) },
   { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…) and the Nova Scotia government, each with a suggested category and whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
   { name: "trending", description: "What Nova Scotians are searching on Google right now, with rough search counts and the headlines behind each search. Searches that look Halifax-related are marked local and matched to leads and stories. A signal of attention only, never a source of facts.", inputSchema: S({}) },
   { name: "read_release", description: "The English text of an official release (halifax.ca or news.novascotia.ca), ready to write from.", inputSchema: S({ url: str("Release URL") }, ["url"]) },
@@ -342,9 +345,38 @@ async function recordCheckin(env: Env, a: Record<string, any>) {
   return { id: a.id, checkedAt: iso() };
 }
 
+async function myProfile(env: Env) {
+  const j = await journalist(env);
+  if (!j) return { exists: false, next: "You don't have a TalkHalifax account yet. Choose a first and last name and a persona, then call set_profile." };
+  return { exists: true, id: j.id, name: j.name, bio: j.bio, persona: j.persona, since: iso(j.created_at) };
+}
+
+async function setProfile(env: Env, a: Record<string, any>) {
+  const bio = String(a.bio || "").trim().slice(0, 300), persona = String(a.persona || "").trim().slice(0, 3000);
+  if (!bio || !persona) throw new NewsroomError("set_profile needs a bio and a persona.");
+  if (!/\bAI\b/.test(bio)) throw new NewsroomError("Your bio must say you're an AI journalist, so readers know.");
+  const j = await journalist(env);
+  if (j) {
+    if (a.name && String(a.name).trim() !== j.name) throw new NewsroomError(`Your name is ${j.name} and can't be changed here. Ask the editor.`);
+    await env.DB.prepare("UPDATE users SET bio = ?, persona = ? WHERE id = ?").bind(bio, persona, j.id).run();
+    return { updated: true, ...(await myProfile(env)) };
+  }
+  const name = String(a.name || "").trim().replace(/\s+/g, " ");
+  if (!/^[\p{L}'’.-]{2,30} [\p{L}'’.-]{2,30}$/u.test(name)) throw new NewsroomError("Your name must be a first and last name, e.g. 'Maren Whitlock'.");
+  const id = randomId("u_", 10);
+  await env.DB.prepare("INSERT INTO users (id, provider, provider_sub, name, avatar_url, email, role, bio, persona, created_at) VALUES (?, 'newsroom', 'journalist', ?, '', '', 'journalist', ?, ?, ?)")
+    .bind(id, name, bio, persona, now()).run();
+  // The journalist wrote every story already on the site, so it's credited with those too
+  const credited = await env.DB.prepare("UPDATE stories SET author_id = ? WHERE author_id IS NULL AND kind != 'skip'").bind(id).run();
+  await tellEditor(env, `👋 Your journalist has a name: <b>${name.replace(/[&<>]/g, "")}</b>\n\n<i>${bio.replace(/[&<>]/g, "")}</i>\n\nCredited on ${credited.meta.changes} existing stories.`);
+  return { created: true, credited: credited.meta.changes, ...(await myProfile(env)) };
+}
+
 async function callTool(env: Env, name: string, a: Record<string, any>) {
   switch (name) {
     case "get_guidelines": return GUIDELINES;
+    case "my_profile": return myProfile(env);
+    case "set_profile": return setProfile(env, a);
     case "scan_sources": return scanSources(env, Math.min(45, Math.max(1, Number(a.days) || 14)));
     case "trending": return trending(env);
     case "read_release": return readRelease(String(a.url || ""));

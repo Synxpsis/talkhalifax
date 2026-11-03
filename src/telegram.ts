@@ -62,6 +62,12 @@ export async function sendDraft(env: Env, id: string): Promise<string> {
   } catch (e) { return String((e as Error).message); }
 }
 
+/** A plain note to the editor (no buttons). Never throws. */
+export async function tellEditor(env: Env, text: string) {
+  if (!approvalOn(env)) return;
+  await tg(env, "sendMessage", { chat_id: env.TELEGRAM_CHAT_ID, text, parse_mode: "HTML", link_preview_options: { is_disabled: true } }).catch(() => {});
+}
+
 const buttons = (approve: string, discard: string) =>
   ({ inline_keyboard: [[{ text: "✅ Approve and publish", callback_data: approve }, { text: "🗑 Discard", callback_data: discard }]] });
 

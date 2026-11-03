@@ -94,6 +94,8 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
     // Once the editor's Telegram is set up, every new article waits for approval; notices still publish at once
     const held = opts.review || (cols.kind === "article" && approvalOn(env));
     const stage = held && cols.kind !== "skip" ? "draft" : "developing";
+    // The journalist is credited with everything it writes, once it has an account
+    if (cols.kind !== "skip") { const j = await journalist(env); if (j) cols.author_id = j.id; }
     const names = Object.keys(cols);
     await env.DB.prepare(
       `INSERT INTO stories (id, ${names.join(", ")}, stage, developing_since, last_newsroom_update, update_note, version, updated_at)
@@ -110,6 +112,9 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
   if (!Object.keys(cols).length && input.reopen !== true) throw new NewsroomError("Nothing to change: pass at least one field.");
   // Once the editor's Telegram is set up, changes to published stories wait for approval too (drafts have no readers yet)
   if (!opts.approved && existing.stage !== "draft" && approvalOn(env)) {
+    // One change at a time per story, so the editor never approves two that clash
+    const waiting = await env.DB.prepare("SELECT n FROM pending_updates WHERE story_id = ? AND status = 'waiting' ORDER BY n DESC LIMIT 1").bind(id).first<{ n: number }>();
+    if (waiting) throw new NewsroomError(`An update to this story (u${waiting.n}) is already waiting for the editor on Telegram. Leave the story as it is until they decide.`);
     const r = await env.DB.prepare("INSERT INTO pending_updates (story_id, input, author, created_at) VALUES (?, ?, ?, ?)")
       .bind(id, JSON.stringify(input), author, Date.now()).run();
     const n = Number(r.meta.last_row_id), ref = `u${n}`;
@@ -145,7 +150,12 @@ export async function newsroom(req: Request, env: Env, url: URL): Promise<Respon
   }
 }
 
-export const newsroomAuthorized = (req: Request, env: Env) =>
+/** The newsroom journalist's TalkHalifax account, once it has made one. */
+export const journalist = (env: Env) =>
+  env.DB.prepare("SELECT id, name, bio, persona, created_at FROM users WHERE provider = 'newsroom' AND provider_sub = 'journalist'")
+    .first<{ id: string; name: string; bio: string; persona: string; created_at: number }>();
+
+export const newsroomAuthorized =(req: Request, env: Env) =>
   !!env.NEWSROOM_TOKEN && req.headers.get("authorization") === `Bearer ${env.NEWSROOM_TOKEN}`;
 
 async function snapshot(env: Env, id: string, version: number, note: string, author = "") {
