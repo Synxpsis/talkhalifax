@@ -9,18 +9,40 @@ const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const CLAIM_MS = 2 * 36e5; // a claimed lead is free again after 2 hours
 const CHECKIN_MS = 12 * 36e5; // a developing story is due a check-in 12 hours after the last one
 const HFX = "https://www.halifax.ca";
-const FEEDS: [string, string][] = [
-  ["/news/category/rss-feed?category=17", "City Hall"],
-  ["/news/category/rss-feed?category=1240", "Cogswell District"],
-  ["/news/category/rss-feed?category=1252", "Budget"],
-  // Winter parking ban enforcement and storm impacts on municipal services: written up as notices
-  ["/news/category/rss-feed?category=22", "Winter operations"],
+const NS = "https://news.novascotia.ca";
+
+// News categories, most urgent first. A lead's category sets its priority (P0–P4); local search interest lifts it to P1.
+const CATEGORIES = ["right-now", "talk-of-the-town", "money-and-homes", "decisions", "community"] as const;
+type Category = typeof CATEGORIES[number];
+const TRENDING_AT = 200; // Google Trends searches that make a lead "talk of the town"
+
+// halifax.ca news categories, each with the category its releases usually belong to (the journalist can change it).
+// Sub-categories come before their parents so a release keeps its most specific section.
+const FEEDS: [number, string, Category][] = [
+  [22, "Winter operations", "right-now"],   // parking ban enforcement and storm impacts: always notices
+  [20, "Road closures", "right-now"],
+  [25, "Police", "right-now"],
+  [1192, "Fire and emergency", "right-now"],
+  [28, "Halifax Water", "right-now"],
+  [981, "Halifax Transit", "decisions"],
+  [1252, "Budget", "money-and-homes"],
+  [1240, "Cogswell District", "money-and-homes"],
+  [19, "Public engagement", "decisions"],
+  [18, "Civic events", "community"],
+  [1257, "Transportation", "decisions"],
+  [17, "City Hall", "decisions"],
 ];
+
+// Release titles that are right-now news whatever feed they came from
+const URGENT = /\b(traffic delay|road closure|lane closure|detour|boil[- ]water|water main|missing (person|man|woman|youth|boy|girl)|evacuat|emergency|outage|service disruption|fire)\b/i;
+
+// Words that mark a trending search or headline as Halifax-area news
+const LOCAL = /\b(halifax|hrm|dartmouth|bedford|sackville|cole harbour|clayton park|spryfield|fall river|timberlea|eastern passage|hammonds plains|tantallon|porters lake|musquodoboit|nova scotia|n\.s\.|nova scotian|mooseheads|wanderers|thunderbirds|dalhousie|saint mary's|stanfield|macdonald bridge|mackay bridge|ns power|nova scotia power)\b/i;
 
 const INSTRUCTIONS = `TalkHalifax is a Halifax news site where every story has a live chat. You are part of its newsroom.
 Before writing, call get_guidelines and follow it exactly: facts are copied from the source, nothing is invented,
-timing is described honestly against today's date (Halifax time). Typical flow: scan_sources or list_leads →
-claim_lead → read_release → publish_story (or update_story for a follow-up) → complete_lead.
+timing is described honestly against today's date (Halifax time). Typical flow: scan_sources and trending → file_lead /
+prioritize_lead → list_leads (highest priority first) → claim_lead → read_release → publish_story (or update_story) → complete_lead.
 Check-ins keep developing stories current: checkin_queue → read_release → update_story if needed → record_checkin.
 Use review: true for anything sensitive (police, health, people named in an incident) so a moderator approves it first.
 When publish_story returns stage draft, the editor approves it on Telegram: call await_review until it's decided, then complete_lead.
@@ -47,14 +69,16 @@ const STORY_FIELDS = {
 };
 const TOOLS = [
   { name: "get_guidelines", description: "The TalkHalifax writing guidelines. Read before writing or updating anything.", inputSchema: S({}) },
-  { name: "scan_sources", description: "Recent halifax.ca news releases (newest first), each marked with whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
-  { name: "read_release", description: "The English text of a halifax.ca release, ready to write from.", inputSchema: S({ url: str("https://www.halifax.ca/… release URL") }, ["url"]) },
+  { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…) and the Nova Scotia government, each with a suggested category and whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
+  { name: "trending", description: "What Nova Scotians are searching on Google right now, with rough search counts and the headlines behind each search. Searches that look Halifax-related are marked local and matched to leads and stories. A signal of attention only, never a source of facts.", inputSchema: S({}) },
+  { name: "read_release", description: "The English text of an official release (halifax.ca or news.novascotia.ca), ready to write from.", inputSchema: S({ url: str("Release URL") }, ["url"]) },
   { name: "list_stories", description: "Stories on the site: id, kind, stage, version, headline, last update, chat and comment counts.", inputSchema: S({ stage: { type: "string", enum: ["developing", "archived", "draft", "all"], description: "Default: all published (developing + archived)" }, limit: { type: "integer", minimum: 1, maximum: 200 } }) },
   { name: "get_story", description: "One story in full, with its recent version history.", inputSchema: S({ id: str("Story id") }, ["id"]) },
   { name: "publish_story", description: "Create a new story. It appears under Developing with a live chat, or waits for a moderator if review is true. Fails if the id exists.", inputSchema: S({ id: str("Use the source release's slug, e.g. municipality-seeks-public-input-…"), ...STORY_FIELDS, note: str("Optional note for the version history"), review: { type: "boolean", description: "Hold as a draft for moderator approval" }, author: str("Your role or name, e.g. writer") }, ["id", "kind", "headline", "source", "publishedAt"]) },
   { name: "update_story", description: "Change an existing story. Readers in its room see the update live, with your note. Pass only the fields that change.", inputSchema: S({ id: str("Story id"), changes: S(STORY_FIELDS), note: str("One short sentence readers will see, saying what changed"), reopen: { type: "boolean", description: "Move an archived story back to Developing (significant follow-ups only)" }, author: str("Your role or name") }, ["id", "note"]) },
-  { name: "list_leads", description: "The newsroom's shared queue of possible stories.", inputSchema: S({ status: { type: "string", enum: ["open", "claimed", "done", "dropped", "all"], description: "Default: open and claimed" } }) },
-  { name: "file_lead", description: "Add a possible story to the queue. Ignored if that source is already a lead.", inputSchema: S({ title: str("Short description"), source_url: str("Source URL"), summary: str("Why it may be worth a story"), source_published_at: str("Source's publish time, ISO 8601"), agent: str("Your role or name") }, ["title", "source_url"]) },
+  { name: "list_leads", description: "The newsroom's shared queue of possible stories, highest priority first: P0 (right now) always leads, then by score (category, search attention, freshness). Work them in this order.", inputSchema: S({ status: { type: "string", enum: ["open", "claimed", "done", "dropped", "all"], description: "Default: open and claimed" } }) },
+  { name: "file_lead", description: "Add a possible story to the queue. Ignored if that source is already a lead.", inputSchema: S({ title: str("Short description"), source_url: str("Source URL"), summary: str("Why it may be worth a story"), source_published_at: str("Source's publish time, ISO 8601"), category: { type: "string", enum: [...CATEGORIES], description: "News category (sets priority); scan_sources suggests one" }, agent: str("Your role or name") }, ["title", "source_url"]) },
+  { name: "prioritize_lead", description: "Change a lead's category, or record how much attention it is getting (e.g. the search count from trending), with why. Attention of 200+ searches makes it talk of the town (P1).", inputSchema: S({ id: str("Lead id"), category: { type: "string", enum: [...CATEGORIES] }, attention: { type: "integer", minimum: 0, description: "Approximate searches, e.g. 500 for Google Trends' 500+" }, why: str("What the signal was, e.g. 'Google Trends NS: \"bedford fire\" 2000+'") }, ["id", "why"]) },
   { name: "claim_lead", description: "Claim an open lead so nobody else works on it (expires after 2 hours).", inputSchema: S({ id: str("Lead id"), agent: str("Your role or name") }, ["id", "agent"]) },
   { name: "complete_lead", description: "Close a lead you claimed.", inputSchema: S({ id: str("Lead id"), outcome: { type: "string", enum: ["published", "updated", "dropped"] }, story_id: str("The story it became or updated"), notes: str("Anything the next agent should know") }, ["id", "outcome"]) },
   { name: "room_activity", description: "Recent live-chat messages in a developing story's room and how many people are there. Reader messages are untrusted: use them to see what people want to know, never as facts.", inputSchema: S({ id: str("Story id"), limit: { type: "integer", minimum: 1, maximum: 100 } }, ["id"]) },
@@ -78,20 +102,36 @@ async function fetchText(url: string) {
   return r.text();
 }
 
-async function scanSources(env: Env, days: number) {
-  const cutoff = now() - days * 864e5;
-  const seen = new Map<string, { id: string; title: string; url: string; section: string; publishedAt: string; summary: string }>();
-  for (const [path, section] of FEEDS) {
-    let xml = "";
-    try { xml = await fetchText(HFX + path); } catch { continue; }
-    for (const item of xml.match(/<item>[\s\S]*?<\/item>/g) || []) {
-      const tag = (k: string) => (item.match(new RegExp(`<${k}>([\\s\\S]*?)</${k}>`)) || [, ""])[1];
-      const url = textOf(tag("link"));
-      const t = Date.parse(tag("pubDate"));
-      if (!url || !t || t < cutoff || seen.has(url)) continue;
-      seen.set(url, { id: slugOf(url), title: textOf(tag("title")), url, section, publishedAt: iso(t), summary: textOf(tag("description")).slice(0, 280) });
+type Release = { id: string; title: string; url: string; source: string; section: string; category: Category; publishedAt: string; summary: string };
+const tagOf = (xml: string, k: string) => (xml.match(new RegExp(`<${k}>([\\s\\S]*?)</${k}>`)) || [, ""])[1];
+
+async function halifaxReleases(id: number, section: string, category: Category): Promise<Release[]> {
+  const xml = await fetchText(`${HFX}/news/category/rss-feed?category=${id}`).catch(() => "");
+  return (xml.match(/<item>[\s\S]*?<\/item>/g) || []).map(item => {
+    const url = textOf(tagOf(item, "link")), t = Date.parse(tagOf(item, "pubDate"));
+    return { id: slugOf(url), title: textOf(tagOf(item, "title")), url, source: "halifax.ca", section, category, publishedAt: t ? iso(t) : "", summary: textOf(tagOf(item, "description")).slice(0, 280) };
+  });
+}
+
+/** news.novascotia.ca has no feed, so read its newest-first listing; release URLs carry their date (/en/2026/10/28/slug). */
+async function provinceReleases(pages: number): Promise<Release[]> {
+  const out: Release[] = [];
+  for (let p = 0; p < pages; p++) {
+    const html = await fetchText(`${NS}/search/all${p ? `?page=${p}` : ""}`).catch(() => "");
+    for (const m of html.matchAll(/<a href="(\/en\/(\d{4})\/(\d{2})\/(\d{2})\/[^"]+)"[^>]*>([^<]+)</g)) {
+      out.push({ id: slugOf(m[1]), title: textOf(m[5]), url: NS + m[1], source: "news.novascotia.ca", section: "Province", category: "decisions", publishedAt: `${m[2]}-${m[3]}-${m[4]}T12:00:00Z`, summary: "" });
     }
   }
+  return out;
+}
+
+async function scanSources(env: Env, days: number) {
+  const cutoff = now() - days * 864e5;
+  const lists = await Promise.all([...FEEDS.map(f => halifaxReleases(...f)), provinceReleases(days > 7 ? 4 : 2)]);
+  const seen = new Map<string, Release>();
+  // A day's slack: provincial releases carry only their date
+  for (const r of lists.flat()) if (r.url && r.publishedAt && Date.parse(r.publishedAt) >= cutoff - 864e5 && !seen.has(r.url)) seen.set(r.url, r);
+  for (const r of seen.values()) if (URGENT.test(r.title)) r.category = "right-now";
   const items = [...seen.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   if (!items.length) return { releases: [] };
   const ids = items.map(i => i.id), urls = items.map(i => i.url);
@@ -109,17 +149,48 @@ async function scanSources(env: Env, days: number) {
 async function readRelease(url: string) {
   let u: URL;
   try { u = new URL(url); } catch { throw new NewsroomError("That isn't a valid URL."); }
-  if (u.protocol !== "https:" || !/(^|\.)halifax\.ca$/.test(u.hostname)) throw new NewsroomError("read_release only reads halifax.ca pages.");
+  if (u.protocol !== "https:" || !/(^|\.)(halifax\.ca|novascotia\.ca)$/.test(u.hostname)) throw new NewsroomError("read_release only reads halifax.ca and novascotia.ca pages.");
   let page = await fetchText(u.toString());
+  const published = page.match(/<time[^>]*datetime="([^"]+)"/)?.[1] || null;
   const main = page.indexOf("<main");
   if (main > 0) page = page.slice(main);
   page = page.replace(/<(script|style|nav|footer)[^>]*>[\s\S]*?<\/\1>/gi, "");
   let text = unescape(unescape(page.replace(/<(br|\/p|\/li|\/h\d|\/div)[^>]*>/gi, "\n").replace(/<[^>]+>/g, " ")))
     .replace(/[ \t ]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
   // The English text comes first; stop where the French version or the site footer starts
-  const cut = [text.indexOf("Message d’intérêt"), text.indexOf("*****"), text.indexOf("Explore this site"), text.indexOf("\nLa Municipalité"), text.indexOf("\nLa municipalité")].filter(k => k > 0);
+  const cut = [text.indexOf("Message d’intérêt"), text.indexOf("*****"), text.indexOf("Explore this site"), text.indexOf("\nLa Municipalité"), text.indexOf("\nLa municipalité"), text.indexOf("\n Follow Us"), text.indexOf("\nFollow Us")].filter(k => k > 0);
   if (cut.length) text = text.slice(0, Math.min(...cut));
-  return { url: u.toString(), id: slugOf(u.toString()), text: text.slice(0, 12000) };
+  return { url: u.toString(), id: slugOf(u.toString()), ...(published ? { published } : {}), text: text.slice(0, 12000) };
+}
+
+/** Google Trends' daily searches for Nova Scotia: attention signals, matched to the newsroom's leads and stories. */
+async function trending(env: Env) {
+  const xml = await fetchText("https://trends.google.com/trending/rss?geo=CA-NS");
+  const [leads, stories] = await Promise.all([
+    env.DB.prepare("SELECT id, title FROM leads WHERE status IN ('open', 'claimed')").all<{ id: string; title: string }>(),
+    env.DB.prepare("SELECT id, headline FROM stories WHERE stage IN ('developing', 'draft') AND kind != 'skip'").all<{ id: string; headline: string }>(),
+  ]);
+  // A search matches when every word of it (3+ letters) is in the lead's title or story's headline
+  const words = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}']{3,}/gu) || [];
+  const matches = (q: string, text: string) => { const w = words(q), t = new Set(words(text)); return w.length > 0 && w.every(x => t.has(x)); };
+  const searches = (xml.match(/<item>[\s\S]*?<\/item>/g) || []).map(item => {
+    const query = textOf(tagOf(item, "title"));
+    const news = [...item.matchAll(/<ht:news_item>([\s\S]*?)<\/ht:news_item>/g)].map(n => ({
+      headline: textOf(tagOf(n[1], "ht:news_item_title")), outlet: textOf(tagOf(n[1], "ht:news_item_source")), url: textOf(tagOf(n[1], "ht:news_item_url")),
+    }));
+    const t = Date.parse(tagOf(item, "pubDate"));
+    return {
+      query, searches: parseInt(tagOf(item, "ht:approx_traffic").replace(/\D/g, "")) || 0, since: t ? iso(t) : null,
+      local: LOCAL.test([query, ...news.map(n => n.headline)].join(" ")),
+      news,
+      leads: leads.results.filter(l => matches(query, l.title)).map(l => l.id),
+      stories: stories.results.filter(s => matches(query, s.headline)).map(s => s.id),
+    };
+  });
+  return {
+    note: "Searches show what people are paying attention to. Use them to choose and order work and to find the official source, never as facts. News links are other outlets: never copy them.",
+    searches,
+  };
 }
 
 async function listStories(env: Env, stage = "", limit = 100) {
@@ -160,16 +231,36 @@ async function roomActivity(env: Env, id: string, limit: number) {
   };
 }
 
+/** P0–P4 from the category, with 200+ searches lifting it to P1; the score orders leads within and across tiers. */
+function rank(l: { category: string; attention: number; source_published_at: string | null; created_at: number }) {
+  const tier = Math.max(0, CATEGORIES.indexOf(l.category as Category));
+  const priority = l.category ? (l.attention >= TRENDING_AT ? Math.min(tier, 1) : tier) : 3;
+  const ageH = Math.max(0, (now() - (Date.parse(l.source_published_at || "") || l.created_at)) / 36e5);
+  const score = (4 - priority) * 100 + (l.attention > 0 ? 40 * Math.log10(l.attention) : 0) - Math.min(100, ageH * 2);
+  return { priority: `P${priority}`, score: Math.round(score) };
+}
+
 async function listLeads(env: Env, status = "") {
   const where = status === "all" ? "1=1" : status ? "status = ?" : "status IN ('open', 'claimed')";
-  const stmt = env.DB.prepare(`SELECT id, title, source_url, summary, source_published_at, status, claimed_by, claimed_at, story_id, notes, created_by, created_at FROM leads WHERE ${where} ORDER BY created_at DESC LIMIT 100`);
+  const stmt = env.DB.prepare(`SELECT id, title, source_url, summary, source_published_at, category, attention, attention_note, status, claimed_by, claimed_at, story_id, notes, created_by, created_at FROM leads WHERE ${where} ORDER BY created_at DESC LIMIT 100`);
   const rows = (await (status && status !== "all" ? stmt.bind(status) : stmt).all<Record<string, any>>()).results;
-  return {
-    leads: rows.map(l => ({
-      ...l, created_at: iso(l.created_at), claimed_at: l.claimed_at ? iso(l.claimed_at) : null,
-      claimExpired: l.status === "claimed" && l.claimed_at && now() - l.claimed_at > CLAIM_MS,
-    })),
-  };
+  const leads = rows.map(l => ({
+    ...l, ...rank(l as any), created_at: iso(l.created_at), claimed_at: l.claimed_at ? iso(l.claimed_at) : null,
+    claimExpired: l.status === "claimed" && l.claimed_at && now() - l.claimed_at > CLAIM_MS,
+  }));
+  // Right-now news always comes first, then the highest score
+  leads.sort((a, b) => Number(b.priority === "P0") - Number(a.priority === "P0") || b.score - a.score);
+  return { leads };
+}
+
+async function prioritizeLead(env: Env, a: Record<string, any>) {
+  const l = await env.DB.prepare("SELECT category, attention, attention_note, source_published_at, created_at FROM leads WHERE id = ?").bind(String(a.id || "")).first<Record<string, any>>();
+  if (!l) throw new NewsroomError(`No lead ${a.id}.`);
+  if (a.category !== undefined && !CATEGORIES.includes(a.category)) throw new NewsroomError(`category must be one of ${CATEGORIES.join(", ")}.`);
+  const category = a.category ?? l.category, attention = a.attention !== undefined ? Math.max(0, Math.round(Number(a.attention) || 0)) : l.attention;
+  const note = [l.attention_note, `${iso().slice(0, 16)}Z ${String(a.why || "").slice(0, 200)}`].filter(Boolean).join("\n").slice(-1000);
+  await env.DB.prepare("UPDATE leads SET category = ?, attention = ?, attention_note = ?, updated_at = ? WHERE id = ?").bind(category, attention, note, now(), a.id).run();
+  return { id: a.id, category, attention, ...rank({ ...l, category, attention } as any) };
 }
 
 async function fileLead(env: Env, a: Record<string, any>) {
@@ -177,10 +268,11 @@ async function fileLead(env: Env, a: Record<string, any>) {
   if (!url || !a.title) throw new NewsroomError("A lead needs a title and source_url.");
   const existing = await env.DB.prepare("SELECT id, status FROM leads WHERE source_url = ?").bind(url).first<{ id: string; status: string }>();
   if (existing) return { id: existing.id, status: existing.status, duplicate: true };
+  const category = CATEGORIES.includes(a.category) ? a.category : "";
   const id = randomId("l_", 6), t = now();
-  await env.DB.prepare("INSERT INTO leads (id, title, source_url, summary, source_published_at, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, String(a.title).slice(0, 200), url, String(a.summary || "").slice(0, 1000), a.source_published_at || null, String(a.agent || "").slice(0, 60), t, t).run();
-  return { id, status: "open" };
+  await env.DB.prepare("INSERT INTO leads (id, title, source_url, summary, source_published_at, category, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, String(a.title).slice(0, 200), url, String(a.summary || "").slice(0, 1000), a.source_published_at || null, category, String(a.agent || "").slice(0, 60), t, t).run();
+  return { id, status: "open", category, ...rank({ category, attention: 0, source_published_at: a.source_published_at || null, created_at: t }) };
 }
 
 async function claimLead(env: Env, id: string, agent: string) {
@@ -244,6 +336,7 @@ async function callTool(env: Env, name: string, a: Record<string, any>) {
   switch (name) {
     case "get_guidelines": return GUIDELINES;
     case "scan_sources": return scanSources(env, Math.min(45, Math.max(1, Number(a.days) || 14)));
+    case "trending": return trending(env);
     case "read_release": return readRelease(String(a.url || ""));
     case "list_stories": return listStories(env, a.stage, Math.min(200, Number(a.limit) || 100));
     case "get_story": return getStory(env, String(a.id || ""));
@@ -257,6 +350,7 @@ async function callTool(env: Env, name: string, a: Record<string, any>) {
     }
     case "list_leads": return listLeads(env, a.status);
     case "file_lead": return fileLead(env, a);
+    case "prioritize_lead": return prioritizeLead(env, a);
     case "claim_lead": return claimLead(env, String(a.id || ""), String(a.agent || "agent"));
     case "complete_lead": return completeLead(env, a);
     case "room_activity": return roomActivity(env, String(a.id || ""), Math.min(100, Number(a.limit) || 30));

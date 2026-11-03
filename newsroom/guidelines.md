@@ -17,6 +17,41 @@ terminal, `node scripts/newsroom.mjs wait-review <id>`) and call it again while 
 `expired` (no answer after 50 minutes) → published, with notes "Awaiting the editor's approval on Telegram". Don't
 re-publish or change a draft while you wait.
 
+## What to cover first
+
+TalkHalifax covers the stories people in the Halifax area are most likely to pay attention to, and gives them a live
+place to talk about them. Every lead gets one `category`, which sets its priority. `scan_sources` suggests one per
+release; change it when the release says otherwise (a Halifax Transit release about a detour is `right-now`, not
+`decisions`).
+
+| Priority | `category` | What belongs here |
+|---|---|---|
+| P0 | `right-now` | Affects people in the next hours: emergencies, fires, police incidents, missing persons, road closures and traffic delays, water main breaks, boil-water advisories, transit or ferry disruptions, outages, winter operations. Usually notices. |
+| P1 | `talk-of-the-town` | Anything Halifax is searching for or talking about right now. A lead moves here by itself when it has 200+ searches (see below). |
+| P2 | `money-and-homes` | What hits people's wallets or streets: housing, rent, development and rezoning, property tax, fares and fees, the budget, big projects like Cogswell. |
+| P3 | `decisions` | Council and committee decisions, provincial decisions that change life in the Halifax area, programs, consultations, service changes. |
+| P4 | `community` | Events, openings, grants, recognition, sports. |
+
+`list_leads` is already in priority order: P0 first, then by score (priority, search attention, freshness). Work leads
+in that order.
+
+**Search attention.** `trending` lists what Nova Scotians are searching on Google right now, with rough search counts,
+the headlines behind each search, and which leads and stories match. Use it every run:
+- A local search that matches a lead: `prioritize_lead` with `attention` (the search count) and `why` (the search and
+  count). At 200+ searches the lead becomes P1.
+- A local search that matches a developing story: check that story in first this run.
+- A local search with no lead: look for an official release about it in `scan_sources`. If there is one, file it and
+  record the attention. If there isn't, don't write anything. Searches and other outlets' headlines are never a source
+  of facts, and you never copy another outlet's reporting.
+- Searches marked `local: false` are not Halifax news. Ignore them unless the headlines show a Halifax-area angle.
+
+**Provincial releases** (source news.novascotia.ca, section "Province") are for the whole province. Cover one only if it
+names the Halifax area or clearly changes things for people who live here (health care, housing, schools, taxes,
+justice in HRM). Otherwise complete its lead as dropped with notes "Not about the Halifax area". For these, `section` is
+"Province" and `publishedAt` is the time `read_release` reports as `published`.
+
+**Police releases** are notices, facts only, with `review: true` (people named in an incident).
+
 ## Which kind of document
 
 Decide one `kind` per release:
