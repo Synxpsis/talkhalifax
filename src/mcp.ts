@@ -3,7 +3,8 @@
 // Authorization: Bearer <NEWSROOM_TOKEN>.
 import { Env, json, randomId } from "./env";
 import { NewsroomError, journalist, newsroomAuthorized, saveStory } from "./stories";
-import { tellEditor } from "./telegram";
+import { tellEditor, approvalOn } from "./telegram";
+import { allow } from "./auth";
 import { weatherWarnings } from "./alerts";
 import GUIDELINES from "../newsroom/guidelines.md";
 
@@ -94,6 +95,8 @@ const TOOLS = [
   { name: "checkin_queue", description: "Developing stories due a check-in (none in the last 12 hours), longest-waiting first, with how many chat messages arrived since the last one.", inputSchema: S({ limit: { type: "integer", minimum: 1, maximum: 50, description: "Default 10" } }) },
   { name: "record_checkin", description: "Log that you checked a developing story against its source. Call it after every check-in, whether or not you changed anything (changes go through update_story first).", inputSchema: S({ id: str("Story id"), outcome: { type: "string", enum: ["unchanged", "updated"] }, notes: str("What you checked and found, for the next agent") }, ["id", "outcome"]) },
   { name: "await_review", description: "Wait for the editor to approve or discard a draft (story id) or a held update (its pending id, e.g. u12) on Telegram. Waits up to `wait` seconds, then says approved, discarded, waiting (call again) or expired (no answer for 50 minutes: stop waiting; the editor can still approve it later).", inputSchema: S({ id: str("Draft story id"), wait: { type: "integer", minimum: 0, maximum: 90, description: "Seconds to wait (default 60)" } }, ["id"]) },
+  { name: "desk_status", description: "The newsroom at a glance: drafts and updates waiting for the editor, open reports, the leads queue, check-ins overdue, what was published in the last 24 hours and the busiest chats. Read-only.", inputSchema: S({}) },
+  { name: "notify_editor", description: "Send the editor a short plain-text note on Telegram (no buttons), e.g. a briefing or something that needs a human. At most 24 notes a day across all agents, so send one note per run, only when there is something worth reading.", inputSchema: S({ text: str("The note, plain text, under 3500 characters"), agent: str("Your role, e.g. desk-editor") }, ["text", "agent"]) },
 ];
 
 // ---------- helpers ----------
@@ -461,6 +464,40 @@ async function setProfile(env: Env, a: Record<string, any>) {
   return { created: true, credited: credited.meta.changes, ...(await myProfile(env)) };
 }
 
+async function deskStatus(env: Env) {
+  const day = iso(now() - 864e5);
+  const [drafts, updates, reports, leads, published, rooms] = await env.DB.batch([
+    env.DB.prepare("SELECT id, kind, headline, updated_at AS since FROM stories WHERE stage = 'draft' ORDER BY updated_at"),
+    env.DB.prepare("SELECT 'u' || n AS id, story_id AS story, author, created_at FROM pending_updates WHERE status = 'waiting' ORDER BY n"),
+    env.DB.prepare("SELECT kind, COUNT(DISTINCT target_id) AS items, COUNT(*) AS reports, MIN(created_at) AS oldest FROM reports WHERE resolved IS NULL GROUP BY kind"),
+    env.DB.prepare("SELECT status, COUNT(*) AS n FROM leads WHERE status IN ('open', 'claimed') OR updated_at > ? GROUP BY status").bind(now() - 864e5),
+    env.DB.prepare("SELECT id, kind, headline, published_at FROM stories WHERE stage != 'draft' AND kind != 'skip' AND published_at > ? ORDER BY published_at DESC").bind(day),
+    env.DB.prepare(`SELECT r.story_id AS id, s.headline, r.message_count AS messages, r.here_now AS hereNow FROM room_stats r JOIN stories s ON s.id = r.story_id
+                     WHERE r.last_message_at > ? ORDER BY r.message_count DESC LIMIT 5`).bind(now() - 864e5),
+  ]);
+  const overdue = (await checkinQueue(env, 50)).due.length;
+  const at = (t: unknown) => typeof t === "number" ? iso(t) : t;
+  return {
+    now: iso(), telegram: approvalOn(env),
+    waitingForEditor: { drafts: drafts.results, updates: (updates.results as any[]).map(u => ({ ...u, created_at: at(u.created_at) })) },
+    openReports: (reports.results as any[]).map(r => ({ ...r, oldest: at(r.oldest) })),
+    leads: Object.fromEntries((leads.results as any[]).map(l => [l.status, l.n])),
+    checkinsOverdue: overdue,
+    publishedLast24h: published.results,
+    busiestChatsLast24h: rooms.results,
+  };
+}
+
+async function notifyEditor(env: Env, a: Record<string, any>) {
+  const text = String(a.text || "").trim(), agent = String(a.agent || "agent").trim().slice(0, 40);
+  if (!text) throw new NewsroomError("notify_editor needs text.");
+  if (!approvalOn(env)) return { sent: false, why: "Telegram isn't set up" };
+  if (!(await allow(env, "notify-editor", 24, 864e5))) return { sent: false, why: "The daily limit of 24 notes is reached. Put it in your run summary instead." };
+  const esc = (s: string) => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+  await tellEditor(env, `🤖 <b>${esc(agent)}</b>\n\n${esc(text.slice(0, 3500))}`);
+  return { sent: true };
+}
+
 async function callTool(env: Env, name: string, a: Record<string, any>) {
   switch (name) {
     case "get_guidelines": return GUIDELINES;
@@ -489,6 +526,8 @@ async function callTool(env: Env, name: string, a: Record<string, any>) {
     case "checkin_queue": return checkinQueue(env, Math.min(50, Number(a.limit) || 10));
     case "record_checkin": return recordCheckin(env, a);
     case "await_review": return awaitReview(env, String(a.id || ""), Math.min(90, Math.max(0, Number(a.wait ?? 60))));
+    case "desk_status": return deskStatus(env);
+    case "notify_editor": return notifyEditor(env, a);
     default: throw new NewsroomError(`Unknown tool ${name}.`);
   }
 }

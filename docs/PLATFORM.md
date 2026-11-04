@@ -1,0 +1,124 @@
+# TalkHalifax: the platform as it is
+
+_A record of everything running on November 3, 2026 (commit `03d8739`, Phase 4). Update it when something changes._
+
+Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/talkhalifax.
+
+## The pieces
+
+```
+ Official sources ──► Newsroom agents (Claude Code cloud routines)
+ halifax.ca             │  through scripts/newsroom.mjs → POST /mcp (Bearer NEWSROOM_TOKEN)
+ news.novascotia.ca     ▼
+ rcmp.ca           Cloudflare Worker  src/index.ts ──► D1 database "talkhalifax"
+ weather.gc.ca          │  /api/*, /auth/*, /mcp, /telegram/webhook, 30-minute cron
+ NS Power outages       ├──► ArticleRoom Durable Object per story (live chat)
+ Signals (never facts): ├──► Workers AI (Llama Guard screens chat and comments)
+ Google Trends,         └──► Telegram bot ──► the editor (approve / discard, notes)
+ r/halifax              ▼
+                   public/index.html + app.js (single-page site, served as static assets)
+```
+
+| Part | Where | What it does |
+|---|---|---|
+| Worker | `src/index.ts` | Routes, the 30-minute cron (weather, alerts, story stages, clean-up) |
+| Auth | `src/auth.ts` | Password and Google sign-in, sessions (HttpOnly cookie), Turnstile, reset links, rate limits |
+| Stories | `src/stories.ts` | Saving stories and versions, Developing → Articles, comments, approvals |
+| Chat rooms | `src/room.ts` | One Durable Object per story: history, presence, typing, screening, bans, removals |
+| Screening | `src/screen.ts` | Rules (slurs, phone numbers, emails, new-account links), then Llama Guard with a 3 s limit |
+| Moderation | `src/moderation.ts` | Reports, bans, purges, account deletion |
+| Newsroom MCP | `src/mcp.ts` | The tools agents use (below) |
+| Telegram | `src/telegram.ts` | Drafts and held updates to the editor with buttons; plain notes |
+| Getting around | `src/alerts.ts` | halifax.ca road notices, Windsor Street Exchange, Transit detours, weather warnings |
+| Weather and tides | `src/weather.ts` | Environment Canada (api.weather.gc.ca) and DFO tides (api-iwls.dfo-mpo.gc.ca) |
+| Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
+| Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
+| Schema | `migrations/0001`–`0009` | D1 tables (below) |
+| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, D1 migrations, `wrangler deploy` |
+
+## Content model
+
+A **story** has a `kind`:
+- `article`: a civic story people can act on or discuss. Facts, body, "what this means", live chat, then comments.
+- `notice`: urgent or safety facts only, no interpretation, no comments. Can be `supersededBy` a newer notice.
+- `skip`: a release we decided not to cover (with a reason), so it isn't picked up again.
+
+And a **stage**:
+- `draft`: waiting for the editor (every new article when Telegram is on, and anything sent with `review: true`).
+- `developing`: on Home with a live chat. Articles move to Articles once quiet: no newsroom update for 12 hours and
+  no chat for 3 hours, or after a week.
+- `archived`: under Articles, chat closed, comments open. A significant follow-up can reopen it.
+
+Every change is a new row in `story_versions`. Changes to published stories wait in `pending_updates` (ids like `u12`)
+until the editor approves.
+
+**Leads** are the queue of possible stories: `open` → `claimed` (2-hour claim) → `done` or `dropped`. Each has a
+category that sets priority: P0 `right-now`, P1 `talk-of-the-town` (200+ searches), P2 `money-and-homes`,
+P3 `decisions`, P4 `community`.
+
+## Sources
+
+| Source | Used for | How |
+|---|---|---|
+| halifax.ca news releases | Articles and notices | `scan_sources`, `read_release` |
+| news.novascotia.ca | Provincial stories that touch Halifax | same |
+| rcmp.ca (Halifax-area detachments) | Police notices, always reviewed | same |
+| Environment Canada | Weather warnings (notices), the weather widget | `conditions`, cron |
+| Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
+| DFO tides | The tide widget | cron |
+| halifax.ca road notices, Transit detours | Getting around list (shown as posted, not rewritten) | cron |
+| Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
+| r/halifax | Signal: something may be happening | `trending` |
+
+## Newsroom tools (MCP at `/mcp`)
+
+`get_guidelines`, `my_profile`, `set_profile`, `scan_sources`, `trending`, `conditions`, `read_release`,
+`list_stories`, `get_story`, `publish_story`, `update_story`, `list_leads`, `file_lead`, `prioritize_lead`,
+`claim_lead`, `complete_lead`, `room_activity`, `checkin_queue`, `record_checkin`, `await_review`,
+`desk_status` (the newsroom at a glance), `notify_editor` (a plain note to the editor on Telegram, 24 a day).
+
+From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json | @file.json]`.
+
+## Site features
+
+- **Home**: developing stories as cards, sorted by latest or busiest, with live people counts; weather, tides,
+  Getting around.
+- **Articles** and **Notices**: archived articles and current notices.
+- **Story**: the article or notice, its facts, version notes, the docked live chat (or comments once archived).
+- **Chat**: live messages, typing, presence, report (⚑), screening with the text handed back if turned away.
+- **Profiles**: your own (messages, password change, delete account, moderator reports) and public ones (the journalist's
+  byline links to hers).
+- **Moderators**: approve drafts in the browser or on Telegram, remove reported items, ban or ban-and-purge, make reset
+  links. Moderators are listed in `ADMIN_EMAILS` / `ADMIN_USERNAMES` in `wrangler.jsonc`.
+- **Privacy** page at `/#privacy`, linked from the footer, menu and sign-up.
+
+## Data (D1 tables)
+
+`users`, `sessions`, `auth_throttle` (rate limits, cleared after a day), `stories`, `story_versions`, `room_stats`,
+`message_index` (a copy of every chat message), `comments`, `feeds` (cached weather and alerts), `leads`,
+`pending_updates`, `reports`, `password_resets`. Live chat history itself lives in each room's Durable Object storage.
+
+## Secrets and settings
+
+On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (optional, not set yet).
+In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` once there is one.
+GitHub repository secret: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding).
+Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
+
+## Agents running now
+
+| Agent | Schedule | Routine |
+|---|---|---|
+| Journalist (Tessa Aldridge, `cloud-routine`) | Hourly at :05 | "TalkHalifax journalist", `trig_01J1HVC3hTLdfBQyN2xhjK5m`, Sonnet 5.5 |
+
+See [OPERATING-MODEL.md](OPERATING-MODEL.md) for the full team and the jobs proposed alongside it.
+
+## Known issues and gaps
+
+- **r/halifax returns HTTP 429** to the Worker (Reddit rate-limits Cloudflare's addresses), so the Reddit signal is
+  usually missing. The journalist reports it and carries on.
+- **Turnstile is off** until a widget's keys are set. Sign-up has rate limits but no bot check.
+- **Library events** (the rest of Phase 3) aren't built.
+- Not yet an installable app: no web manifest, service worker or push notifications.
+- Cron expressions are in UTC, so routines run an hour later in Halifax local time from November to March.

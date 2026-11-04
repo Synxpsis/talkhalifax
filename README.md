@@ -2,6 +2,8 @@
 
 Halifax news, rewritten as short articles with a live chat in each one. Runs on Cloudflare Workers.
 
+**Docs:** [vision](docs/VISION.md) · [the platform today](docs/PLATFORM.md) · [operating model and agents](docs/OPERATING-MODEL.md) · [design system](docs/DESIGN-SYSTEM.md) · [working rules for agents](CLAUDE.md)
+
 - `public/`: the page (`index.html`, `app.js`), served as static assets
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts
 - `src/alerts.ts`: the home page's Getting around list: halifax.ca road notices and Windsor Street Exchange work, Halifax Transit detours, and Environment Canada weather warnings, shown as posted with links (not rewritten)
@@ -50,7 +52,7 @@ Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc
 
 Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work through the newsroom MCP server at `/mcp` (Bearer `NEWSROOM_TOKEN`). From a terminal, `node scripts/newsroom.mjs list` and `publish <file.json> [id]` do the same, and `tool <name> [json | @file.json]` calls any MCP tool (`tool list` names them).
 
-**The journalist** is a Claude Code cloud routine, "TalkHalifax journalist", that runs at five past every hour on the Claude plan (no Anthropic API key). It clones this repo and uses `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. Each run files the last 3 days' new halifax.ca releases as leads, then works up to 5 open leads and records its versions as `cloud-routine`. It then checks in on up to 5 developing stories that haven't had a check-in in 12 hours (`checkin_queue`, `record_checkin`). It re-reads each source and fixes only stale timing or facts the city changed. Its prompt and schedule live at claude.ai/code/routines. It needs, in its cloud environment:
+**The agents** are Claude Code cloud routines on the Claude plan (no Anthropic API key). They clone this repo and use `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. The journalist, "TalkHalifax journalist", runs at five past every hour: it files new releases from halifax.ca, the province and Halifax-area RCMP, plus live weather warnings and outages, as leads; works up to 5 leads in priority order; and checks in on up to 5 developing stories. The other jobs (desk editor, standards editor, site reliability, source scout) and their schedules are in [docs/OPERATING-MODEL.md](docs/OPERATING-MODEL.md); each one's prompt is in `newsroom/routines/`. Routines are managed at claude.ai/code/routines. They need, in their cloud environment:
 - an environment variable `TALKHALIFAX_TOKEN` set to the newsroom token
 - network access to `talkhalifax.alexwmmolloy.workers.dev`
 
