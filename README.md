@@ -2,7 +2,7 @@
 
 Halifax news, rewritten as short articles with a live chat in each one. Runs on Cloudflare Workers.
 
-**Docs:** [vision](docs/VISION.md) · [the platform today](docs/PLATFORM.md) · [operating model and agents](docs/OPERATING-MODEL.md) · [design system](docs/DESIGN-SYSTEM.md) · [working rules for agents](CLAUDE.md)
+**Docs:** [vision](docs/VISION.md) · [the platform today](docs/PLATFORM.md) · [operating model and agents](docs/OPERATING-MODEL.md) · [design system](docs/DESIGN-SYSTEM.md) · [roadmap](docs/ROADMAP.md) · [tech debt](docs/TECH-DEBT.md) · [working rules for agents](CLAUDE.md)
 
 - `public/`: the page (`index.html`, `app.js`), served as static assets
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts

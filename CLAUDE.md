@@ -7,6 +7,7 @@ with a live chat. Start with these:
 - [docs/PLATFORM.md](docs/PLATFORM.md): everything that exists today
 - [docs/OPERATING-MODEL.md](docs/OPERATING-MODEL.md): the agent team, schedules and Telegram
 - [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md): tokens, components, layout
+- [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/TECH-DEBT.md](docs/TECH-DEBT.md): what is next, and what we owe
 - [newsroom/guidelines.md](newsroom/guidelines.md): how stories are written (agents read it every run)
 - [README.md](README.md): run locally, deploy, secrets
 

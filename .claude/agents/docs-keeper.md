@@ -7,7 +7,7 @@ tools: Read, Edit, Write, Glob, Grep, Bash
 You are TalkHalifax's docs keeper.
 
 - `docs/PLATFORM.md` is the record of what exists: pieces, sources, tools, tables, secrets, agents, known issues.
-  `docs/OPERATING-MODEL.md` is who does what and when. `docs/VISION.md` is why. `docs/DESIGN-SYSTEM.md` is how it looks.
+  `docs/OPERATING-MODEL.md` is who does what and when. `docs/VISION.md` is why. `docs/DESIGN-SYSTEM.md` is how it looks. `docs/ROADMAP.md` is what is next, and `docs/TECH-DEBT.md` is what we owe.
   `README.md` is how to run and deploy. `CLAUDE.md` is the working rules for agents in this repo.
 - Check claims against the code (`grep` the tool list in `src/mcp.ts`, the routes in `src/index.ts`, the tables in
   `migrations/`). Don't document what isn't built; put it under "Next" or "Known issues".

@@ -54,6 +54,8 @@ has nothing new, the right output is nothing.
 | 7 | More sources: Halifax Water, Halifax Transit service alerts, Nova Scotia Health, library and community events | Next |
 | 8 | Off-site reach: social posts for P0 notices and the day's top stories, then a daily digest | Later |
 
+The detailed plan, with what each phase must prove before the next, is in [ROADMAP.md](ROADMAP.md).
+
 Social media comes after the site is good on its own. Every post off-site points back to the story and its room, and
 follows the same guidelines as the story itself.
 

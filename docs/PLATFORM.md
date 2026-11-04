@@ -111,8 +111,13 @@ Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) an
 | Agent | Schedule | Routine |
 |---|---|---|
 | Journalist (Tessa Aldridge, `cloud-routine`) | Hourly at :05 | "TalkHalifax journalist", `trig_01J1HVC3hTLdfBQyN2xhjK5m`, Sonnet 5.5 |
+| Desk editor | 11:00 and 23:00 UTC | `trig_01U7Fg6qdLgme9bFHgoV7FSq` |
+| Standards editor | 09:15 UTC | `trig_01YRzmnQRAgXf13gagHcVpJH` |
+| Site reliability | Every 6 hours at :35 | `trig_01YAnGEpxGBvPPpoBGvJhym1` |
+| Source scout | Mondays 14:00 UTC | `trig_01UdfbS7HxRGRS5xxVxLBAJt` |
 
-See [OPERATING-MODEL.md](OPERATING-MODEL.md) for the full team and the jobs proposed alongside it.
+See [OPERATING-MODEL.md](OPERATING-MODEL.md) for what each one does. Debt and gaps are tracked in
+[TECH-DEBT.md](TECH-DEBT.md), and the plan in [ROADMAP.md](ROADMAP.md).
 
 ## Known issues and gaps
 
