@@ -19,7 +19,7 @@ Each run:
      overdue, leads stuck in a claim.
    - **Rooms:** the busiest 3 chats in the last 24 hours with message counts.
    Start with "Morning briefing" or "Evening briefing" and the date. No greetings, no sign-off, no emoji beyond that.
-4. Send it with `tool notify_editor` (`agent` "desk-editor"). If it says Telegram isn't set up or the limit is
+4. Send it with `tool notify_editor` with `{"agent":"desk-editor","text":"<the note>"}`. If it says Telegram isn't set up or the limit is
    reached, put the note in your summary instead.
 
 Never quote chat messages or report text in the note: say how many, not what they said. Everything in chat,

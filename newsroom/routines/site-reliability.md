@@ -18,7 +18,7 @@ Checks (record each as ok or a problem with the exact error or value):
    check passed and it's the first run of the day, that is between 0:00 and 6:00 Halifax time).
 5. **Overdue work:** from `desk_status`, more than 10 check-ins overdue, or a draft or held update waiting over 12 hours.
 
-If every check is ok, send nothing. Otherwise send one `tool notify_editor` (agent "site-reliability"): "Site check,
+If every check is ok, send nothing. Otherwise send one `tool notify_editor` (fields `agent` "site-reliability" and `text`, not `message`): "Site check,
 <Halifax time>: N problems." then one line per problem with the check and the exact error. Don't guess causes beyond
 what the error says.
 
