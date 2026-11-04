@@ -29,7 +29,8 @@ The editor approves on Telegram, with Approve and Discard buttons:
 - Every new `article`: `publish_story` returns `stage: "draft"`. Wait with the story id.
 - Every `update_story` change to a published story (articles and notices, Developing or Articles, check-ins
   included): it returns `pending` with an id like `"u12"`, and nothing changes on the site until the editor approves.
-  Wait with that pending id.
+  Wait with that pending id. The one exception: a numbers-only change to a live weather or outage notice publishes at
+  once (see "Live conditions").
 (New notices and skips publish at once, unless you used `review: true`.)
 
 Don't wait for the editor. Their tap publishes the article or applies the update by itself, whenever it comes, so
@@ -86,9 +87,16 @@ for Halifax, and Nova Scotia Power's outage totals for the province, each with a
   itself or say where outages are beyond what the output states: the outage totals cover all of Nova Scotia.
 - A weather warning that replaces an earlier one (a watch upgraded to a warning, a new day's warning): publish the new
   one, then mark the older one `supersededBy` it.
-- Check-ins for these stories use `conditions` instead of `read_release`. A warning no longer listed has ended: update
-  its notice's `status` to "Ended" with note "Environment Canada ended the warning". For an outage notice, update
-  the counts when they change by a lot (half or double), and set "Restored" once customers out drop below 500.
+- Check-ins for these stories use `conditions` instead of `read_release`, and happen every run: `conditions` lists our
+  live notices as `openNotices` (from any day), and `checkin_queue` puts them first, due hourly. A warning no longer
+  listed has ended: update its notice's `statusLabel` to "Ended" with note "Environment Canada ended the warning".
+- Outage notices: update the counts when they change by a lot (half or double). Set `statusLabel` "Restored" once
+  customers out drop below 500. A Restored notice stays Restored until customers out go back above 2,000; then set
+  `statusLabel` "Ongoing" with the new counts. Between 500 and 2,000 leave a Restored notice alone. If outages pass
+  2,000 on a later day, `conditions` gives a new lead: publish it and mark the older notice `supersededBy` the new one.
+- A change to one of these notices that only moves numbers, times and dates (new counts and a new "updated" time, in
+  the same wording) publishes at once without the editor's tap (`update_story` returns `autoApplied`), and the editor
+  is told afterwards. Keep the wording the same so it qualifies; a new status or new wording waits for approval.
 
 **Provincial releases** (source news.novascotia.ca, section "Province") are for the whole province. Cover one only if it
 names the Halifax area or clearly changes things for people who live here (health care, housing, schools, taxes,

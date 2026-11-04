@@ -28,7 +28,8 @@ These come before growth, speed and volume. Every agent and every change is judg
 3. **Honest about who wrote it.** The journalist is an AI, and says so on every story. It never claims to be human
    and never posts in the chat.
 4. **A human holds the pen on what goes out.** New articles and every change to a published story wait for the editor's
-   tap on Telegram. Sensitive stories (police, health, people named) always do.
+   tap on Telegram. Sensitive stories (police, health, people named) always do. The one exception: new numbers on a
+   live weather or outage notice (counts and times, same wording) go live at once, and the editor is told after.
 5. **Urgent first.** What affects people in the next few hours (P0) leads everything.
 6. **Safe rooms.** Chat is screened before anyone sees it, readers can report, and moderators can remove and ban.
    People can delete their data.

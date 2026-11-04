@@ -56,3 +56,21 @@ jobs:
         run: npx wrangler d1 migrations apply talkhalifax --remote
       - name: Deploy
         run: npx wrangler deploy
+      # Load the live site. If it's broken, go back to the previous version (database migrations stay applied)
+      - name: Smoke test
+        id: smoke
+        run: |
+          B=https://talkhalifax.alexwmmolloy.workers.dev
+          check() {
+            curl -sf -m 20 "$B/" | grep -q TalkHalifax &&
+            curl -sf -m 20 "$B/api/stories" | grep -q '"stories"' &&
+            curl -sf -m 20 "$B/api/weather" | grep -q '"weather"'
+          }
+          for i in 1 2 3 4 5; do
+            if check; then echo "Site is up"; exit 0; fi
+            echo "Attempt $i failed"; sleep 10
+          done
+          exit 1
+      - name: Roll back
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: npx wrangler rollback --yes --message "Smoke test failed for ${GITHUB_SHA::7}"

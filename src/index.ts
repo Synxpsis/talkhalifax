@@ -5,7 +5,7 @@ import { addComment, archiveStory, deleteComment, evaluateStages, listComments, 
 import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
 import { getAlerts, refreshAlerts } from "./alerts";
-import { telegramWebhook } from "./telegram";
+import { telegramWebhook, tellEditor } from "./telegram";
 export { ArticleRoom } from "./room";
 
 interface StoryRow {
@@ -225,6 +225,28 @@ async function tidyUp(env: Env) {
   ]);
 }
 
+/** Tell the editor when a cron job fails twice in a row, and once more when it recovers. Counts live in feeds ('cron-health'). */
+const CRON_ALERT_AFTER = 2;
+async function watchCron(env: Env, results: (readonly [string, PromiseSettledResult<unknown>])[]) {
+  const row = await env.DB.prepare("SELECT body FROM feeds WHERE name = 'cron-health'").first<{ body: string }>();
+  const fails: Record<string, number> = row ? JSON.parse(row.body) : {};
+  const notes: string[] = [];
+  for (const [name, r] of results) {
+    const before = fails[name] || 0;
+    if (r.status === "rejected") {
+      console.error(`cron ${name}:`, r.reason);
+      fails[name] = before + 1;
+      if (fails[name] === CRON_ALERT_AFTER) notes.push(`⚠️ <b>${name}</b> has failed ${CRON_ALERT_AFTER} runs in a row: ${String((r.reason as Error)?.message ?? r.reason).replace(/[&<>]/g, "").slice(0, 300)}`);
+    } else {
+      if (before >= CRON_ALERT_AFTER) notes.push(`✅ <b>${name}</b> is working again after ${before} failed runs.`);
+      fails[name] = 0;
+    }
+  }
+  await env.DB.prepare("INSERT INTO feeds (name, body, updated_at) VALUES ('cron-health', ?, ?) ON CONFLICT(name) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at")
+    .bind(JSON.stringify(fails), new Date().toISOString()).run();
+  if (notes.length) await tellEditor(env, `🛠 <b>Site cron</b> (every 30 minutes)\n\n${notes.join("\n")}`);
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
@@ -245,6 +267,8 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    await Promise.allSettled([refreshWeather(env), refreshAlerts(env), evaluateStages(env), tidyUp(env)]);
+    const jobs = { weather: refreshWeather, alerts: refreshAlerts, stages: evaluateStages, "clean-up": tidyUp };
+    const results = await Promise.allSettled(Object.values(jobs).map(job => job(env)));
+    await watchCron(env, Object.keys(jobs).map((name, i) => [name, results[i]] as const));
   },
 } satisfies ExportedHandler<Env>;

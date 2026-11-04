@@ -13,12 +13,12 @@ The team is running. What's left is to stop stale facts reaching readers and to 
 
 | Work | Debt | Done when |
 |---|---|---|
-| Notices built from live conditions are checked every hour, not every 12 hours | N1 | An outage notice is never more than about an hour behind `conditions` |
-| Outage notices stop flipping: one threshold to restore, a higher one to reopen | N2 | Guidelines changed; no notice flips twice in a day |
-| **Editor decision:** which changes can go live without a tap (proposal: number-only updates to conditions notices, reported on Telegram afterwards) | N3 | The rule is written in guidelines.md and OPERATING-MODEL.md, and the code follows it |
-| The journalist reads its prompt from the repo like the other agents | N4 | Routine prompt is a pointer; `journalist.md` is the only copy |
-| A smoke test after every deploy, with automatic rollback | C2 | A deliberately broken deploy rolls itself back in CI |
-| The cron tells the editor when it keeps failing | D4 | Two failed weather or stage runs in a row send one Telegram note |
+| ✅ Notices built from live conditions are checked every hour, not every 12 hours | N1 | An outage notice is never more than about an hour behind `conditions` |
+| ✅ Outage notices stop flipping: one threshold to restore, a higher one to reopen | N2 | Guidelines changed; no notice flips twice in a day |
+| ✅ **Editor decision:** which changes can go live without a tap (proposal: number-only updates to conditions notices, reported on Telegram afterwards) | N3 | The rule is written in guidelines.md and OPERATING-MODEL.md, and the code follows it |
+| ✅ The journalist reads its prompt from the repo like the other agents | N4 | Routine prompt is a pointer; `journalist.md` is the only copy |
+| ✅ A smoke test after every deploy, with automatic rollback | C2 | A deliberately broken deploy rolls itself back in CI |
+| ✅ The cron tells the editor when it keeps failing | D4 | Two failed weather or stage runs in a row send one Telegram note |
 | One line-ending rule for the whole repo | C6 | `.gitattributes` committed; no CRLF notes left in CLAUDE.md |
 | Turnstile keys set (editor) | D3 | Sign-up shows the check on the live site |
 

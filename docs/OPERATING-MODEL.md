@@ -8,7 +8,8 @@ One human and a set of agents. Agents do the watching, writing, checking and rep
 
 ### The editor (human)
 
-- Approves or discards every new article and every change to a published story, from Telegram.
+- Approves or discards every new article and every change to a published story, from Telegram. The exception is a
+  numbers-only change to a live weather or outage notice, which goes live at once and is reported after.
 - Approves sensitive stories (police, health, people named) before they publish.
 - Handles reports, bans and reset links on the site.
 - Reads two briefings a day. Changes the guidelines and the agents' jobs.
@@ -66,6 +67,8 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
 |---|---|---|
 | 📝 New article or notice waiting | Journalist (`publish_story`) | Approve / Discard |
 | ✏️ Change to a published story | Journalist, standards editor (`update_story`) | Approve / Discard |
+| 🔢 Updated without approval (new numbers on a live weather or outage notice) | Journalist, standards editor (`update_story`) | No |
+| 🛠 Site cron failed twice in a row (weather, alerts, stages, clean-up), then recovered | The Worker | No |
 | 🚩 First report on a message or comment | Readers | No (review on the site) |
 | 👋 Journalist profile created | Journalist | No |
 | 🤖 Briefing, audit, health or scouting note | Desk, standards, reliability, scout (`notify_editor`) | No |

@@ -1,5 +1,5 @@
 import { Env, User, json, randomId } from "./env";
-import { approvalOn, sendDraft, sendUpdate } from "./telegram";
+import { approvalOn, sendDraft, sendUpdate, tellEditor } from "./telegram";
 import { screen } from "./screen";
 
 // ---------- When a developing story moves down to Articles ----------
@@ -74,6 +74,20 @@ const API_NAMES: Record<string, typeof FIELDS[number]> = {
 
 export class NewsroomError extends Error {}
 
+// ---------- Changes that skip the editor ----------
+// Notices built from the conditions tool (weather warnings, NS Power outage totals) are live data. A change to one that
+// only moves numbers, times and dates (new counts, a new "updated at") goes live at once and the editor is told after.
+// Anything else, a new status or new wording, still waits for a tap.
+export const LIVE_NOTICE = /^(ns-power-outages-|weather-)/;
+const NUMBER_ONLY_FIELDS = new Set(["headline", "dek", "facts", "body", "means", "published_at"]);
+const TIME_WORDS = /\b[ap]\.m\.|\b(am|pm|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tonight|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?)\b\.?/gi;
+/** The text with its numbers, times and dates blanked out, so two versions that differ only in those compare equal. */
+const shape = (v: unknown) => String(v ?? "").toLowerCase().replace(TIME_WORDS, "#").replace(/\d[\d,.:+-]*/g, "#").replace(/#(\W*#)+/g, "#").replace(/\s+/g, " ").trim();
+function numberOnly(current: Record<string, unknown>, cols: Record<string, unknown>) {
+  const changed = Object.keys(cols).filter(c => String(cols[c]) !== String(current[c] ?? ""));
+  return changed.length > 0 && changed.every(c => NUMBER_ONLY_FIELDS.has(c) && shape(cols[c]) === shape(current[c]));
+}
+
 /** Create a story (developing, or a draft held for review) or update an existing one. Shared by the REST endpoint and the MCP tools. */
 export async function saveStory(env: Env, id: string, input: Record<string, unknown>,
   opts: { mode: "create" | "update" | "upsert"; review?: boolean; author?: string; approved?: boolean } = { mode: "upsert" }) {
@@ -86,7 +100,7 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
     cols[col] = JSON_FIELDS.has(col) ? JSON.stringify(input[apiName]) : input[apiName];
   }
   if (cols.kind != null && !["article", "notice", "skip"].includes(String(cols.kind))) throw new NewsroomError("kind must be article, notice or skip.");
-  const existing = await env.DB.prepare("SELECT version, stage FROM stories WHERE id = ?").bind(id).first<{ version: number; stage: string }>();
+  const existing = await env.DB.prepare(`SELECT version, stage, ${FIELDS.join(", ")} FROM stories WHERE id = ?`).bind(id).first<{ version: number; stage: string } & Record<string, unknown>>();
   const now = nowIso();
 
   if (!existing) {
@@ -112,10 +126,14 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
   if (existing.stage === "discarded") throw new NewsroomError("That story was discarded by a moderator and can't be changed.");
   if (!Object.keys(cols).length && input.reopen !== true) throw new NewsroomError("Nothing to change: pass at least one field.");
   // Once the editor's Telegram is set up, changes to published stories wait for approval too (drafts have no readers yet)
+  let auto = false;
   if (!opts.approved && existing.stage !== "draft" && approvalOn(env)) {
     // One change at a time per story, so the editor never approves two that clash
     const waiting = await env.DB.prepare("SELECT n FROM pending_updates WHERE story_id = ? AND status = 'waiting' ORDER BY n DESC LIMIT 1").bind(id).first<{ n: number }>();
     if (waiting) throw new NewsroomError(`An update to this story (u${waiting.n}) is already waiting for the editor on Telegram. Leave the story as it is until they decide.`);
+    auto = existing.kind === "notice" && LIVE_NOTICE.test(id) && input.reopen !== true && numberOnly(existing, cols);
+  }
+  if (!opts.approved && existing.stage !== "draft" && approvalOn(env) && !auto) {
     const r = await env.DB.prepare("INSERT INTO pending_updates (story_id, input, author, created_at) VALUES (?, ?, ?, ?)")
       .bind(id, JSON.stringify(input), author, Date.now()).run();
     const n = Number(r.meta.last_row_id), ref = `u${n}`;
@@ -133,6 +151,11 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
   await snapshot(env, id, version, note, author);
   // Drafts have no readers yet; everything else tells its room
   if (existing.stage !== "draft") await tellRoom(env, id, { t: "updated", version, note });
+  if (auto) {
+    const esc = (s: string) => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+    await tellEditor(env, `🔢 <b>Updated without approval</b> (numbers only, live notice)\n\n<b>${esc(String(cols.headline ?? existing.headline))}</b>\n${esc(note)}`);
+    return { id, version, created: false, stage: existing.stage, autoApplied: "Numbers-only change to a live-conditions notice: published now, and the editor was told." };
+  }
   return { id, version, created: false, reopened: reopen, stage: reopen ? "developing" : existing.stage };
 }
 
