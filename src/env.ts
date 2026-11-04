@@ -13,6 +13,11 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;
   /** The editor's Telegram chat id; the bot replies with it on /start. With the token set, new articles need approval. */
   TELEGRAM_CHAT_ID?: string;
+  /** Workers AI, for screening chat messages and comments (Llama Guard). */
+  AI?: Ai;
+  /** Cloudflare Turnstile on sign-up. The site key is public (a var); the secret is a secret. Both set turns it on. */
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET?: string;
   /** "1" enables the localhost-only dev sign-in. Set in .dev.vars, never in production. */
   DEV_LOGIN?: string;
 }
@@ -24,6 +29,8 @@ export interface User {
   email: string;
   role: "member" | "moderator";
   banned: number;
+  provider: string;
+  created_at: number;
 }
 
 export const json = (data: unknown, init: ResponseInit = {}) =>

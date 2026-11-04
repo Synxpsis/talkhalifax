@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { Env, randomId } from "./env";
+import { screen } from "./screen";
 
 /**
  * One ArticleRoom per story: its live chat.
@@ -7,7 +8,7 @@ import { Env, randomId } from "./env";
  * Wire protocol (JSON text frames)
  *   client → room   { t: "send", text } | { t: "typing", on } | { t: "del", id }
  *   room → client   { t: "hello", you, messages, profiles, here }
- *                   { t: "msg", m, profile } | { t: "del", id } | { t: "here", here } | { t: "error", text }
+ *                   { t: "msg", m, profile } | { t: "del", id } | { t: "here", here } | { t: "error", text, rejected? }
  *
  * The Worker authenticates before upgrading and passes the person in x-th-* headers; a socket with no
  * user id is a reader. Names are looked up from D1, so a renamed account shows its current name.
@@ -68,7 +69,7 @@ export class ArticleRoom extends DurableObject<Env> {
     let msg: { t?: string; text?: unknown; on?: unknown; id?: unknown };
     try { msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
     const att = ws.deserializeAttachment() as Attachment;
-    const error = (text: string) => ws.send(JSON.stringify({ t: "error", text }));
+    const error = (text: string, rejected?: string) => ws.send(JSON.stringify({ t: "error", text, rejected }));
 
     if (msg.t === "send") {
       if (!att.uid) return error("Sign in to join the chat.");
@@ -81,6 +82,16 @@ export class ArticleRoom extends DurableObject<Env> {
       att.sent.push(now);
       att.typing = false;
       ws.serializeAttachment(att);
+      // A ban takes effect on the next message, even in a chat that was already open
+      const author = await this.env.DB.prepare("SELECT banned, created_at FROM users WHERE id = ?").bind(att.uid).first<{ banned: number; created_at: number }>();
+      if (!author || author.banned) {
+        att.banned = true; ws.serializeAttachment(att);
+        await this.announceHere();
+        return error("Your account can't post right now.");
+      }
+      // Screened before anyone sees it; a rejected message goes back to its writer's box
+      const why = await screen(this.env, text, author);
+      if (why) { await this.announceHere(); return error(why, text); }
       const m: Message = { id: randomId("m_", 8), uid: att.uid, text, at: now };
       this.ctx.storage.sql.exec("INSERT INTO messages (id, uid, text, at) VALUES (?, ?, ?, ?)", m.id, m.uid, m.text, m.at);
       const profile = (await this.profiles([m.uid]))[m.uid];
@@ -136,6 +147,13 @@ export class ArticleRoom extends DurableObject<Env> {
       const messages = this.ctx.storage.sql.exec<Message & Record<string, string | number>>(
         "SELECT id, uid, text, at FROM messages ORDER BY at DESC LIMIT ?", limit).toArray().reverse();
       return Response.json({ messages, hereNow: this.here().here.length });
+    } else if (sig.t === "remove") {
+      // A moderator acted on a report or a ban: take these messages out of everyone's chat
+      for (const id of ((sig as { ids?: string[] }).ids || []).map(String)) {
+        this.ctx.storage.sql.exec("DELETE FROM messages WHERE id = ?", id);
+        this.broadcast({ t: "del", id });
+      }
+      await this.updateStats();
     } else if (sig.t === "close") {
       this.broadcast({ t: "closed" });
       for (const ws of this.ctx.getWebSockets()) { try { ws.close(1000, "Moved to Articles"); } catch { /* already closing */ } }

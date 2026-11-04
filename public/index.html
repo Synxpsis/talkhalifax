@@ -467,6 +467,34 @@ img { max-width: 100%; }
 .auth-form .btn { margin-top: 14px; }
 .auth-form .btn:disabled { opacity: .5; cursor: default; }
 .auth-err { color: var(--warn); font-size: 14px; margin-top: 6px; }
+.auth-err.ok { color: var(--ink-muted); }
+.ts-box { margin-top: 12px; min-height: 65px; }
+/* Moderation: reports, moderator tools on a profile, reset links, account settings */
+.report { border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+.report .k { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.report .rq { font-size: 16px; line-height: 1.5; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report .rw { font-size: 13.5px; color: var(--muted); margin: 0; }
+.report .by-link, .dr-foot .by-link { all: unset; cursor: pointer; color: var(--ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.report .by-link:focus-visible, .dr-foot .by-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.mod-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.mod-tools .btn { padding: 9px 16px; font-size: 14px; }
+.danger-btn { color: var(--warn); border-color: var(--warn) !important; }
+.reset-link { display: flex; flex-direction: column; gap: 8px; border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; max-width: 560px; }
+.reset-link label { font-size: 13px; font-weight: 600; }
+.reset-link .row2 { display: flex; gap: 8px; }
+.reset-link input { flex: 1; min-width: 0; min-height: 44px; border: 1px solid var(--ink-faint); background: var(--field); border-radius: var(--radius-s); padding: 0 12px; font: inherit; font-family: var(--f-mono); font-size: 13px; }
+.reset-link small { font-size: 12.5px; color: var(--muted); }
+.setting-more { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.setting-more summary { cursor: pointer; font-size: 15px; }
+.setting-more .auth-form { margin-top: 12px; }
+.del-acct { margin-top: 10px; }
+.rep-done { cursor: default; }
+/* Privacy notice */
+.legal > p, .legal > ul { max-width: 68ch; }
+.legal h2 { font-size: 18px; margin: 28px 0 8px; }
+.legal p, .legal li { font-family: var(--f-read); font-size: 16.5px; line-height: 1.6; }
+.legal ul { padding-left: 20px; margin: 0; }
+.legal li { margin-bottom: 6px; }
 /* Notices: one card per notice, coloured by severity (urgent, disruption, info, resolved) */
 .nfilters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
 .nfilters button { all: unset; box-sizing: border-box; cursor: pointer; min-height: 36px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--ink-muted); }
@@ -546,6 +574,43 @@ img { max-width: 100%; }
 
   <section class="view wrap" id="profile" hidden></section>
   <section class="view wrap" id="user" hidden></section>
+  <section class="view wrap" id="reset" hidden></section>
+
+  <section class="view wrap legal" id="privacy" hidden>
+    <button type="button" class="back" data-go="home">← Home</button>
+    <div class="forum-top"><h1>Privacy</h1></div>
+    <p>TalkHalifax keeps as little about you as it can. This is everything, in plain words.</p>
+
+    <h2>What we keep</h2>
+    <ul>
+      <li><b>Your account.</b> Your username and a scrambled (hashed) copy of your password. If you sign in with Google instead, your name, email address and profile photo from Google.</li>
+      <li><b>What you post.</b> Your chat messages and comments, and any reports you make.</li>
+      <li><b>One cookie</b> that keeps you signed in for 30 days. There are no advertising or tracking cookies, and no analytics.</li>
+      <li><b>Your connection's IP address</b>, briefly, to slow down mass sign-ups and password guessing. It's deleted within a day.</li>
+      <li>Settings, like whether the chat starts open, stay in your own browser.</li>
+    </ul>
+
+    <h2>Who sees it</h2>
+    <ul>
+      <li>Your name, photo and what you post are public: on the story, and on your profile.</li>
+      <li>Moderators see reports, including the text that was reported.</li>
+      <li>Messages and comments are checked before they appear, by fixed rules and by an AI model that Cloudflare runs, to keep out slurs, threats, hate and personal details.</li>
+      <li>The newsroom's AI journalist (Claude, made by Anthropic) can read recent chat messages to decide what to look into. It never quotes them or treats them as facts.</li>
+      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor.</li>
+      <li>We don't sell your data or share it with anyone else.</li>
+    </ul>
+
+    <h2>How long</h2>
+    <p>When a story moves to Articles, its live chat closes and its messages come down. A copy stays in our database, out of view, so moderators can act on reports, until you delete it or your account.</p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>Delete any of your messages or comments yourself, at any time.</li>
+      <li>Change your password from your profile. If you're locked out, a moderator can send you a one-time reset link.</li>
+      <li>Delete your account from your profile. Your messages and comments are erased, your account is emptied, and you're signed out everywhere.</li>
+    </ul>
+    <p class="forum-foot">Last updated November 3, 2026.</p>
+  </section>
 
 </main>
 
@@ -553,7 +618,7 @@ img { max-width: 100%; }
 
 <footer>
   <div class="wrap">
-    <p>TalkHalifax is a prototype. Articles are written by AI from Halifax Regional Municipality releases and may contain mistakes; each one links to its original for attribution. Weather from Environment and Climate Change Canada, tides from Fisheries and Oceans Canada.</p>
+    <p>TalkHalifax is a prototype. Articles are written by AI from Halifax Regional Municipality releases and may contain mistakes; each one links to its original for attribution. Weather from Environment and Climate Change Canada, tides from Fisheries and Oceans Canada. <a href="#privacy">Privacy</a></p>
   </div>
 </footer>
 

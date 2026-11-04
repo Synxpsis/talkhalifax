@@ -34,8 +34,17 @@ It needs one repository secret, `CLOUDFLARE_API_TOKEN`: a Cloudflare API token w
 Secrets live on the Worker, not in the repo:
 - `NEWSROOM_TOKEN`: lets the newsroom publish (`npx wrangler secret put NEWSROOM_TOKEN`; keep a copy in `.newsroom-token` for `scripts/newsroom.mjs`)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: optional; Google sign-in stays off without them
+- `TURNSTILE_SECRET`: optional, with the public `TURNSTILE_SITE_KEY` var in `wrangler.jsonc`; sign-up asks for Cloudflare's bot check only when both are set
 
 Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc`.
+
+## Moderation
+
+- **Screening.** Every chat message and comment is checked before anyone sees it ([src/screen.ts](src/screen.ts)): fixed rules turn away slurs, phone numbers, email addresses and links from accounts under a day old, then Llama Guard on Workers AI turns away threats, hate and sexual content. A turned-away chat message goes back into its writer's box. If the model takes over 3 seconds, the message posts on the rules alone.
+- **Reports.** Signed-in readers flag a message (⚑) or comment (Report). Moderators see open reports on their profile and remove the item or dismiss the report; the editor gets a Telegram note on each item's first report.
+- **Bans.** From someone's profile a moderator can ban them from posting (it applies to their next message, even in an open chat), or ban them and remove everything they posted. Moderators and the journalist can't be banned.
+- **Password reset.** Password accounts have no email, so a moderator makes a one-time reset link from the person's profile (valid 1 hour) and sends it to them. Anyone signed in can change their password or delete their account from their profile.
+- **Privacy.** The notice is at `/#privacy`. The cron trigger deletes rate-limit counters (some keyed by IP address) after a day, and expired sessions and reset links.
 
 ## Publishing stories
 
@@ -47,4 +56,4 @@ Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work thr
 
 ## Not built yet
 
-Library events (the rest of Phase 3), and launch hardening (Phase 4: Turnstile, message pre-screening, report and ban tools, privacy policy, password reset).
+Library events (the rest of Phase 3).

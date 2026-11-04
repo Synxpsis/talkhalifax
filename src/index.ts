@@ -1,5 +1,6 @@
 import { Env, json } from "./env";
-import { allow, currentUser, handleAuth, providers, sameOrigin } from "./auth";
+import { allow, currentUser, handleAuth, makeResetToken, providers, sameOrigin } from "./auth";
+import { deleteAccount, listReports, report, resolveReport, setBanned } from "./moderation";
 import { addComment, archiveStory, deleteComment, evaluateStages, listComments, listDrafts, newsroom, reopenStory, reviewDraft } from "./stories";
 import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
@@ -44,10 +45,10 @@ const STORY_SELECT = `
 async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const path = url.pathname;
 
-  if (path === "/api/me") {
+  if (path === "/api/me" && req.method === "GET") {
     const u = await currentUser(req, env);
     return json({
-      user: u ? { id: u.id, name: u.name, avatarUrl: u.avatar_url, role: u.role, banned: !!u.banned } : null,
+      user: u ? { id: u.id, name: u.name, avatarUrl: u.avatar_url, role: u.role, banned: !!u.banned, password: u.provider === "password" } : null,
       providers: providers(env, url),
     });
   }
@@ -91,11 +92,62 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
     ).bind(u.id).all<StoryRow>()).results.map(r => storyOut(r)) : [];
     const stats = await env.DB.prepare("SELECT COUNT(*) AS messages, COUNT(DISTINCT story_id) AS rooms FROM message_index WHERE user_id = ? AND deleted = 0")
       .bind(u.id).first<{ messages: number; rooms: number }>();
+    // Moderators also see whether they're banned and whether a reset link can be made
+    const viewer = await currentUser(req, env);
+    const mod = viewer?.role === "moderator" && u.id !== viewer.id && !ai && u.role !== "moderator"
+      ? { banned: !!(await env.DB.prepare("SELECT banned FROM users WHERE id = ?").bind(u.id).first<{ banned: number }>())?.banned, password: u.provider === "password" }
+      : null;
     return json({
       user: { id: u.id, name: u.name, avatar: u.avatar_url, bio: u.bio, role: u.role, ai, joined: u.created_at },
       stats: { messages: stats?.messages ?? 0, rooms: stats?.rooms ?? 0 },
       stories,
+      mod,
     });
+  }
+
+  // Someone deletes their own account
+  if (path === "/api/me" && req.method === "DELETE") {
+    if (req.headers.get("origin") !== url.origin) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u) return json({ error: "Sign in first." }, { status: 401 });
+    const res = await deleteAccount(env, u);
+    res.headers.append("set-cookie", `th_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${url.protocol === "https:" ? "; Secure" : ""}`);
+    return res;
+  }
+
+  // Reports: anyone signed in flags a message or comment; moderators review them
+  if (path === "/api/reports") {
+    const u = await currentUser(req, env);
+    if (req.method === "POST") {
+      if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+      if (!u) return json({ error: "Sign in to report." }, { status: 401 });
+      return report(req, env, u, (k, n, w) => allow(env, k, n, w));
+    }
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    return listReports(env);
+  }
+  const rp = path.match(/^\/api\/reports\/([A-Za-z0-9_]{1,40})$/);
+  if (rp && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    const { action } = await req.json<{ action?: string }>().catch(() => ({ action: "" }));
+    if (action !== "remove" && action !== "dismiss") return json({ error: "action must be remove or dismiss" }, { status: 400 });
+    return (await resolveReport(env, rp[1], action)) ? json({ ok: true }) : json({ error: "That report was already handled." }, { status: 409 });
+  }
+
+  // Moderators ban people and make password reset links
+  const um = path.match(/^\/api\/users\/([A-Za-z0-9_]{1,40})\/(ban|reset)$/);
+  if (um && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    const u = await currentUser(req, env);
+    if (!u || u.role !== "moderator") return json({ error: "Moderators only." }, { status: 403 });
+    if (um[2] === "ban") {
+      const b = await req.json<{ banned?: boolean; purge?: boolean }>().catch(() => ({} as { banned?: boolean; purge?: boolean }));
+      return setBanned(env, um[1], !!b.banned, !!b.purge);
+    }
+    const token = await makeResetToken(env, um[1], u.id);
+    return token ? json({ url: `${url.origin}/#reset-${token}`, expiresIn: "1 hour" }) : json({ error: "Only accounts with a password can be reset." }, { status: 400 });
   }
 
   if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
@@ -163,6 +215,16 @@ async function room(req: Request, env: Env, id: string): Promise<Response> {
   return stub.fetch(new Request(`https://room/${encodeURIComponent(id)}`, { headers }));
 }
 
+/** Forget what's no longer needed: rate-limit counters (some are keyed by IP address), expired sessions and reset links. */
+async function tidyUp(env: Env) {
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM auth_throttle WHERE window_start < ?").bind(now - 864e5),
+    env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
+    env.DB.prepare("DELETE FROM password_resets WHERE expires_at < ?").bind(now),
+  ]);
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
@@ -183,6 +245,6 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    await Promise.allSettled([refreshWeather(env), refreshAlerts(env), evaluateStages(env)]);
+    await Promise.allSettled([refreshWeather(env), refreshAlerts(env), evaluateStages(env), tidyUp(env)]);
   },
 } satisfies ExportedHandler<Env>;

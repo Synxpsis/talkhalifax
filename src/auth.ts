@@ -25,6 +25,8 @@ export function providers(env: Env, url: URL) {
     password: true,
     google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
     dev: env.DEV_LOGIN === "1" && isLocal(url),
+    // Turnstile's public site key when sign-up asks for a human check, else null
+    turnstile: env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET ? env.TURNSTILE_SITE_KEY : null,
   };
 }
 
@@ -57,6 +59,30 @@ const DUMMY_HASH = "pbkdf2-sha256$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAA
 
 const USERNAME = /^[a-z0-9_.-]{3,20}$/;
 
+/** Why a new password won't do, or null. */
+function weakPassword(username: string, password: string) {
+  if (password.length < 8 || password.length > 200) return "Use a password of at least 8 characters.";
+  if (password.toLowerCase() === username) return "Your password can't be the same as your username.";
+  return null;
+}
+
+const sha256hex = async (s: string) =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, "0")).join("");
+
+// ---------- Turnstile ----------
+/** Cloudflare's human check on sign-up. Passes when Turnstile isn't configured. */
+async function humanCheck(env: Env, req: Request, token: string) {
+  if (!env.TURNSTILE_SITE_KEY || !env.TURNSTILE_SECRET) return true;
+  if (!token) return false;
+  const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token });
+  const ip = req.headers.get("cf-connecting-ip");
+  if (ip) body.set("remoteip", ip);
+  try {
+    const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
+    return !!(await r.json<{ success?: boolean }>()).success;
+  } catch { return false; }
+}
+
 // ---------- Throttling ----------
 /** Counts events per key in a fixed window; returns false once the limit is reached. */
 export async function allow(env: Env, key: string, limit: number, windowMs: number) {
@@ -80,16 +106,17 @@ export function sameOrigin(req: Request, url: URL) {
 }
 
 async function readCreds(req: Request) {
-  let body: { username?: unknown; password?: unknown } = {};
+  let body: { username?: unknown; password?: unknown; turnstile?: unknown } = {};
   try { body = await req.json(); } catch { /* handled below */ }
-  return { username: String(body.username ?? "").trim().toLowerCase(), password: String(body.password ?? "") };
+  return { username: String(body.username ?? "").trim().toLowerCase(), password: String(body.password ?? ""), turnstile: String(body.turnstile ?? "") };
 }
 
 async function passwordSignup(req: Request, env: Env, url: URL) {
-  const { username, password } = await readCreds(req);
+  const { username, password, turnstile } = await readCreds(req);
   if (!USERNAME.test(username)) return json({ error: "Usernames are 3 to 20 characters: letters, numbers, dots, dashes or underscores." }, { status: 400 });
-  if (password.length < 8 || password.length > 200) return json({ error: "Use a password of at least 8 characters." }, { status: 400 });
-  if (password.toLowerCase() === username) return json({ error: "Your password can't be the same as your username." }, { status: 400 });
+  const weak = weakPassword(username, password);
+  if (weak) return json({ error: weak }, { status: 400 });
+  if (!(await humanCheck(env, req, turnstile))) return json({ error: "Couldn't confirm you're a person. Finish the check above the button and try again.", retryCheck: true }, { status: 400 });
   const ip = req.headers.get("cf-connecting-ip") || "local";
   if (!(await allow(env, `signup:${ip}`, 5, 3600_000))) return json({ error: "Too many new accounts from this connection. Try again in an hour." }, { status: 429 });
   const taken = await env.DB.prepare("SELECT 1 FROM users WHERE provider = 'password' AND provider_sub = ?").bind(username).first();
@@ -123,6 +150,77 @@ async function passwordLogin(req: Request, env: Env, url: URL) {
   return sessionJson(env, url, user.id);
 }
 
+// ---------- Changing and resetting passwords ----------
+/** A signed-in person with a password account changes it. Their other sessions are signed out. */
+async function changePassword(req: Request, env: Env) {
+  const user = await currentUser(req, env);
+  if (!user) return json({ error: "Sign in first." }, { status: 401 });
+  const row = await env.DB.prepare("SELECT provider_sub, password_hash FROM users WHERE id = ? AND provider = 'password'")
+    .bind(user.id).first<{ provider_sub: string; password_hash: string }>();
+  if (!row) return json({ error: "This account signs in with Google, so it has no password here." }, { status: 400 });
+  let body: { current?: unknown; password?: unknown } = {};
+  try { body = await req.json(); } catch { /* handled below */ }
+  const current = String(body.current ?? ""), password = String(body.password ?? "");
+  const key = `login:${row.provider_sub}`;
+  if (!(await allow(env, key, 10, 15 * 60_000))) return json({ error: "Too many tries. Wait 15 minutes and try again." }, { status: 429 });
+  if (!(await verifyPassword(current, row.password_hash))) return json({ error: "Your current password isn't right." }, { status: 401 });
+  const weak = weakPassword(row.provider_sub, password);
+  if (weak) return json({ error: weak }, { status: 400 });
+  await clearThrottle(env, key);
+  const sid = cookies(req)[SESSION_COOKIE];
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), user.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?").bind(user.id, sid),
+  ]);
+  return json({ ok: true });
+}
+
+const RESET_MS = 3600_000;
+
+/** A moderator makes a one-time reset link for a password account. Returns the token, or null for other accounts. */
+export async function makeResetToken(env: Env, userId: string, moderatorId: string) {
+  const u = await env.DB.prepare("SELECT 1 FROM users WHERE id = ? AND provider = 'password'").bind(userId).first();
+  if (!u) return null;
+  const token = randomId("", 24);
+  await env.DB.batch([
+    // Only the newest link works
+    env.DB.prepare("UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0").bind(userId),
+    env.DB.prepare("INSERT INTO password_resets (token_hash, user_id, created_by, expires_at) VALUES (?, ?, ?, ?)")
+      .bind(await sha256hex(token), userId, moderatorId, Date.now() + RESET_MS),
+  ]);
+  return token;
+}
+
+/** The account a reset link is for, while the link still works. */
+async function resetInfo(env: Env, token: string) {
+  if (!token) return null;
+  return env.DB.prepare(
+    `SELECT r.token_hash, u.id, u.provider_sub AS username FROM password_resets r JOIN users u ON u.id = r.user_id
+      WHERE r.token_hash = ? AND r.used = 0 AND r.expires_at > ? AND u.provider = 'password'`,
+  ).bind(await sha256hex(token), Date.now()).first<{ token_hash: string; id: string; username: string }>();
+}
+const RESET_GONE = "This reset link has expired or was already used. Ask a moderator for a new one.";
+
+/** Someone opens a reset link and picks a new password: every old session ends and they're signed in. */
+async function resetPassword(req: Request, env: Env, url: URL) {
+  const ip = req.headers.get("cf-connecting-ip") || "local";
+  if (!(await allow(env, `reset:${ip}`, 10, 15 * 60_000))) return json({ error: "Too many tries. Wait 15 minutes and try again." }, { status: 429 });
+  let body: { token?: unknown; password?: unknown } = {};
+  try { body = await req.json(); } catch { /* handled below */ }
+  const r = await resetInfo(env, String(body.token ?? ""));
+  if (!r) return json({ error: RESET_GONE }, { status: 410 });
+  const password = String(body.password ?? "");
+  const weak = weakPassword(r.username, password);
+  if (weak) return json({ error: weak }, { status: 400 });
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(await hashPassword(password), r.id),
+    env.DB.prepare("UPDATE password_resets SET used = 1 WHERE token_hash = ?").bind(r.token_hash),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(r.id),
+  ]);
+  await clearThrottle(env, `login:${r.username}`);
+  return sessionJson(env, url, r.id);
+}
+
 async function sessionJson(env: Env, url: URL, userId: string) {
   const sid = randomId("s_", 24);
   const now = Date.now();
@@ -136,7 +234,7 @@ export async function currentUser(req: Request, env: Env): Promise<User | null> 
   const sid = cookies(req)[SESSION_COOKIE];
   if (!sid) return null;
   return await env.DB.prepare(
-    `SELECT u.id, u.name, u.avatar_url, u.email, u.role, u.banned
+    `SELECT u.id, u.name, u.avatar_url, u.email, u.role, u.banned, u.provider, u.created_at
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > ?`,
   ).bind(sid, Date.now()).first<User>();
@@ -234,6 +332,19 @@ export async function handleAuth(req: Request, env: Env, url: URL): Promise<Resp
   if ((path === "/auth/signup" || path === "/auth/login") && req.method === "POST") {
     if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 403 });
     return path === "/auth/signup" ? passwordSignup(req, env, url) : passwordLogin(req, env, url);
+  }
+
+  if (path === "/auth/password" && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 403 });
+    return changePassword(req, env);
+  }
+  if (path === "/auth/reset" && req.method === "GET") {
+    const r = await resetInfo(env, url.searchParams.get("token") || "");
+    return r ? json({ username: r.username }) : json({ error: RESET_GONE }, { status: 410 });
+  }
+  if (path === "/auth/reset" && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 403 });
+    return resetPassword(req, env, url);
   }
 
   if (path === "/auth/logout" && req.method === "POST") {

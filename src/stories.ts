@@ -1,5 +1,6 @@
 import { Env, User, json, randomId } from "./env";
 import { approvalOn, sendDraft, sendUpdate } from "./telegram";
+import { screen } from "./screen";
 
 // ---------- When a developing story moves down to Articles ----------
 // All of these must hold, or it has been developing longer than MAX_DEVELOPING.
@@ -14,7 +15,7 @@ const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 const roomStub = (env: Env, id: string) => env.ROOMS.get(env.ROOMS.idFromName(id));
 
 /** Tell a story's room something happened (article updated, chat closing). Ignored if nobody ever opened it. */
-async function tellRoom(env: Env, id: string, body: unknown) {
+export async function tellRoom(env: Env, id: string, body: unknown) {
   await roomStub(env, id).fetch(new Request(`https://room/${encodeURIComponent(id)}/internal`, {
     method: "POST", headers: { "x-th-internal": "1", "x-th-story": id }, body: JSON.stringify(body),
   }));
@@ -222,6 +223,8 @@ export async function addComment(req: Request, env: Env, storyId: string, user: 
     parentId = p.parent_id || p.id;
   }
   if (!(await allow(`comment:${user.id}`, 6, 60_000))) return json({ error: "You're commenting quickly. Wait a minute and try again." }, { status: 429 });
+  const why = await screen(env, text, user);
+  if (why) return json({ error: why }, { status: 422 });
   const id = randomId("c_", 8);
   const at = Date.now();
   await env.DB.prepare("INSERT INTO comments (id, story_id, parent_id, user_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?)")

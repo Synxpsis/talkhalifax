@@ -27,6 +27,7 @@
     me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, offline: false,
     sort: "active", current: "home", article: null, user: null, userFrom: null, users: {},
   };
+  const reported = new Set(); // messages and comments this person has reported
   const room = { ws: null, id: null, messages: [], profiles: {}, here: [], readers: 0, you: null, error: "", typing: false, armed: null, armedTimer: null, tries: 0, closing: false };
 
   async function getJSON(url) {
@@ -421,6 +422,8 @@
     if (mine || mod) acts.push(CM.armed === c.id
       ? `<button type="button" class="danger" data-cdel="${esc(c.id)}">${mine ? "Delete" : "Remove"} for good</button>`
       : `<button type="button" data-cdel="${esc(c.id)}">${mine ? "Delete" : "Remove"}</button>`);
+    else if (S.me && !S.me.banned) acts.push(reported.has(c.id) ? `<span>Reported</span>`
+      : `<button type="button" data-crep="${esc(c.id)}">${CM.armed === "r:" + c.id ? "Report to a moderator?" : "Report"}</button>`);
     return `<div class="cm">
         ${avatar({ id: c.uid, name: c.name, avatar: c.avatar })}
         <div>
@@ -467,6 +470,19 @@
       CM.replyTo = CM.replyTo === b.dataset.reply ? null : b.dataset.reply;
       renderComments();
       const ta = $("#cm-reply"); if (ta) ta.focus();
+    }));
+    document.querySelectorAll("[data-crep]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.crep;
+      if (CM.armed !== "r:" + id) {
+        CM.armed = "r:" + id; clearTimeout(CM.armedTimer);
+        CM.armedTimer = setTimeout(() => { CM.armed = null; renderComments(); }, 4000);
+        return renderComments();
+      }
+      CM.armed = null;
+      const err = await sendReport("comment", id);
+      if (err) { b.textContent = err; return; }
+      reported.add(id);
+      renderComments();
     }));
     document.querySelectorAll("[data-cdel]").forEach(b => b.addEventListener("click", async () => {
       const id = b.dataset.cdel;
@@ -554,6 +570,9 @@
         room.here = d.here; room.readers = d.readers; Object.assign(room.profiles, d.profiles); renderHere();
       } else if (d.t === "error") {
         showChatError(d.text);
+        // A message the screening turned away goes back in the box, so it can be reworded
+        const i = $("#chatInput");
+        if (d.rejected && i && !i.value.trim()) { i.value = d.rejected; $("#chatSend").disabled = false; }
       } else if (d.t === "article") {
         refreshArticleInPlace(id);
       } else if (d.t === "closed") {
@@ -595,7 +614,7 @@
         ${avatar(room.profiles[g.uid] || { id: g.uid, name: "" })}
         <div class="meta"><b>${esc(nameOf(g.uid))}</b> ${mine ? "You · " : "· "}${esc(hm(g.items[0].at))}</div>
         ${g.items.map(m => `<div class="bubble-row"><div class="bubble">${esc(m.text)}</div>${mine || mod
-          ? `<button type="button" class="x${room.armed === m.id ? " armed" : ""}" data-del="${esc(m.id)}" aria-label="${mine ? "Delete" : "Remove"} message">${room.armed === m.id ? (mine ? "Delete?" : "Remove?") : "×"}</button>` : ""}</div>`).join("")}
+          ? `<button type="button" class="x${room.armed === m.id ? " armed" : ""}" data-del="${esc(m.id)}" aria-label="${mine ? "Delete" : "Remove"} message">${room.armed === m.id ? (mine ? "Delete?" : "Remove?") : "×"}</button>` : reportBtn(m)}</div>`).join("")}
       </div>`;
     }).join("") : `<div class="chat-empty">No messages yet.<br>Start the conversation about this article.</div>`;
     box.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => {
@@ -607,9 +626,36 @@
       }
       room.armed = null; sendRoom({ t: "del", id });
     }));
+    box.querySelectorAll("[data-rep]").forEach(b => b.addEventListener("click", async () => {
+      const id = b.dataset.rep;
+      if (room.armed !== "r:" + id) {
+        room.armed = "r:" + id; clearTimeout(room.armedTimer);
+        room.armedTimer = setTimeout(() => { room.armed = null; renderChat(); }, 4000);
+        return renderChat();
+      }
+      room.armed = null;
+      const err = await sendReport("message", id);
+      if (err) showChatError(err); else reported.add(id);
+      renderChat();
+    }));
     if (toBottom || near) box.scrollTop = box.scrollHeight;
     renderHere();
     const e = $("#chatErr"); if (e) { e.hidden = !room.error; e.textContent = room.error; }
+  }
+
+  // Signed-in readers can flag someone else's message for a moderator
+  function reportBtn(m) {
+    if (!S.me || S.me.banned) return "";
+    if (reported.has(m.id)) return `<span class="x armed rep-done">Reported</span>`;
+    const armed = room.armed === "r:" + m.id;
+    return `<button type="button" class="x${armed ? " armed" : ""}" data-rep="${esc(m.id)}" aria-label="Report this message to a moderator">${armed ? "Report?" : "⚑"}</button>`;
+  }
+  /** Flag a chat message or comment. Returns an error to show, or "" when it went through. */
+  async function sendReport(kind, id) {
+    const r = await fetch("/api/reports", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, id }) }).catch(() => null);
+    if (r && r.ok) return "";
+    const d = r ? await r.json().catch(() => ({})) : {};
+    return d.error || "That report didn't go through. Try again.";
   }
 
   function renderHere() {
@@ -656,8 +702,45 @@
     }));
   }
 
+  // ---------- Reports (moderators) ----------
+  // Messages and comments readers flagged. Removing takes it down everywhere; banning is on the writer's profile.
+  async function loadReports() {
+    const box = $("#pReports");
+    if (!box) return;
+    let list;
+    try { list = (await getJSON("/api/reports")).reports; } catch (e) { box.innerHTML = `<p class="msg" style="border:0">Couldn't load reports.</p>`; return; }
+    if (S.current !== "profile") return;
+    box.innerHTML = list.length ? list.map(r => `<div class="report glass">
+        <span class="k">${r.kind === "message" ? "Chat message" : "Comment"} · ${r.reports} ${r.reports === 1 ? "report" : "reports"} · ${ago(r.at)}</span>
+        <p class="rq">${esc(r.text)}</p>
+        <p class="rw">By <button type="button" class="by-link" data-user="${esc(r.authorId)}">${esc(r.author || "someone")}</button>${r.banned ? " (banned)" : ""}
+          in <button type="button" class="by-link" data-article="${esc(r.storyId)}">${esc(r.headline || "a story")}</button></p>
+        <div class="review-acts">
+          <button type="button" class="btn primary" data-rp="remove" data-id="${esc(r.id)}">Remove it</button>
+          <button type="button" class="btn ghost" data-rp="dismiss" data-id="${esc(r.id)}">It's fine</button>
+        </div>
+      </div>`).join("") : `<p class="msg" style="border:0">No open reports. When readers flag a message or comment, it shows up here.</p>`;
+    box.querySelectorAll("[data-rp]").forEach(b => b.addEventListener("click", async () => {
+      b.disabled = true;
+      await fetch(`/api/reports/${encodeURIComponent(b.dataset.id)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: b.dataset.rp }) }).catch(() => null);
+      loadReports();
+    }));
+  }
+
   // ---------- Profile ----------
   let authMode = "login";
+  // Turnstile (Cloudflare's bot check) on sign-up, loaded only when someone opens the sign-up form
+  let tsReady = null, tsToken = "", tsWidget = null;
+  function loadTurnstile() {
+    if (!tsReady) tsReady = new Promise((res, rej) => {
+      const sc = document.createElement("script");
+      sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      sc.async = true; sc.onload = res; sc.onerror = () => { tsReady = null; rej(); };
+      document.head.appendChild(sc);
+    });
+    return tsReady;
+  }
+  function resetTurnstile() { tsToken = ""; if (tsWidget != null && window.turnstile) window.turnstile.reset(tsWidget); }
   function renderMeButton() {
     const b = $("#meBtn");
     if (S.me) {
@@ -670,6 +753,7 @@
   }
 
   /** Someone's public profile; for the newsroom's journalist, every story they wrote. */
+  const UM = { armed: null, link: null };
   async function renderUser() {
     const v = $("#user"), id = S.user;
     const backBtn = S.userFrom && S.userFrom.startsWith("article-")
@@ -697,8 +781,75 @@
           <span class="tt">${esc(x.headline)}</span>
           ${x.dek ? `<span class="dk">${esc(x.dek)}</span>` : ""}
           <span class="ft"><span>${shortDate(x.publishedAt)}</span></span></button>`).join("") || '<div class="msg">No stories yet.</div>'}</div>` : ""}
+      ${d.mod ? `<h2 class="p-h">Moderator tools</h2>
+      ${d.mod.banned ? `<p class="u-bio">Banned: they can read, but can't chat, comment or report.</p>` : ""}
+      <div class="mod-tools">
+        ${d.mod.banned ? `<button type="button" class="btn ghost" data-mod="unban">Unban</button>`
+          : `<button type="button" class="btn ghost" data-mod="ban">Ban from posting</button>
+             <button type="button" class="btn ghost${UM.armed === "purge" ? " danger-btn" : ""}" data-mod="purge">${UM.armed === "purge" ? "Ban and erase everything they posted?" : "Ban and remove their posts"}</button>`}
+        ${d.mod.password ? `<button type="button" class="btn ghost" data-mod="reset">Make a password reset link</button>` : ""}
+      </div>
+      ${UM.link && UM.link.id === u.id ? `<div class="reset-link glass"><label for="rsUrl">Reset link for ${esc(u.name)}</label>
+        <div class="row2"><input id="rsUrl" readonly value="${esc(UM.link.url)}"><button type="button" class="btn primary" id="rsCopy">Copy</button></div>
+        <small>Works once, for the next hour. Send it to them privately; anyone with it can set their password.</small></div>` : ""}
+      <div class="auth-err" id="umErr" role="alert" hidden></div>` : ""}
       <p class="p-note">${u.ai ? "An AI journalist: every story is written from an official release, and an editor approves articles before they publish." : `Joined ${shortDate(u.joined)}.`}</p>
     </div>`;
+    v.querySelectorAll("[data-mod]").forEach(b => b.addEventListener("click", async () => {
+      const act = b.dataset.mod, err = $("#umErr");
+      if (act === "purge" && UM.armed !== "purge") { UM.armed = "purge"; return renderUser(); }
+      UM.armed = null; b.disabled = true;
+      const post = (path, body) => fetch(`/api/users/${encodeURIComponent(id)}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+      const r = act === "reset" ? await post("reset", {}) : await post("ban", { banned: act !== "unban", purge: act === "purge" });
+      const out = r ? await r.json().catch(() => ({})) : {};
+      if (!r || !r.ok) { err.textContent = out.error || "That didn't work. Try again."; err.hidden = false; b.disabled = false; return; }
+      if (act === "reset") UM.link = { id, url: out.url };
+      renderUser();
+    }));
+    const copy = $("#rsCopy");
+    if (copy) copy.addEventListener("click", async () => {
+      const i = $("#rsUrl"); i.select();
+      try { await navigator.clipboard.writeText(i.value); copy.textContent = "Copied"; } catch (e) { document.execCommand("copy"); copy.textContent = "Copied"; }
+    });
+  }
+
+  /** A reset link a moderator sent: choose a new password, then you're signed in. */
+  async function renderReset() {
+    const v = $("#reset"), token = S.resetToken;
+    v.innerHTML = `<div class="profile">${back()}${loadingMsg()}</div>`;
+    let who;
+    try {
+      const r = await fetch("/auth/reset?token=" + encodeURIComponent(token));
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "This reset link isn't working. Ask a moderator for a new one.");
+      who = d.username;
+    } catch (e) {
+      if (S.current === "reset") v.innerHTML = `<div class="profile">${back()}<div class="msg">${esc(e.message && !/fetch/i.test(e.message) ? e.message : "Can't reach TalkHalifax. Check your connection and try again.")}</div></div>`;
+      return;
+    }
+    if (S.current !== "reset") return;
+    v.innerHTML = `<div class="profile">${back()}
+      <div class="profile-card glass"><div class="pic">${PERSON_SVG}</div>
+        <div><h1>Choose a new password</h1><p>For <b>${esc(who)}</b>. This link works once.</p></div></div>
+      <form class="auth-form glass" id="rsForm" novalidate>
+        <input type="text" name="username" autocomplete="username" value="${esc(who)}" hidden>
+        <label for="rsPass">New password</label>
+        <input id="rsPass" type="password" autocomplete="new-password" minlength="8" maxlength="200" required aria-describedby="rsHint">
+        <small id="rsHint">At least 8 characters. Anywhere else this account is signed in will be signed out.</small>
+        <div class="auth-err" id="rsErr" role="alert" hidden></div>
+        <button type="submit" class="btn primary" id="rsGo">Save and sign in</button>
+      </form>
+    </div>`;
+    $("#rsForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const err = $("#rsErr"), go = $("#rsGo");
+      go.disabled = true; err.hidden = true;
+      const r = await fetch("/auth/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, password: $("#rsPass").value }) }).catch(() => null);
+      const d = r ? await r.json().catch(() => ({})) : {};
+      if (!r || !r.ok) { err.textContent = d.error || "Can't reach TalkHalifax. Check your connection and try again."; err.hidden = false; go.disabled = false; return; }
+      await loadMe();
+      goTo("profile");
+    });
   }
 
   async function renderProfile() {
@@ -721,7 +872,8 @@
           ${creating ? '<small id="userHint">3 to 20 characters: letters, numbers, dots, dashes or underscores. Shown next to your messages.</small>' : ""}
           <label for="authPass">Password</label>
           <input id="authPass" name="password" type="password" autocomplete="${creating ? "new-password" : "current-password"}" minlength="${creating ? 8 : 1}" maxlength="200" required ${creating ? 'aria-describedby="passHint"' : ""}>
-          ${creating ? '<small id="passHint">At least 8 characters. There\'s no email reset yet, so keep it somewhere safe.</small>' : ""}
+          ${creating ? '<small id="passHint">At least 8 characters. There\'s no email reset: if you\'re locked out, a moderator can send you a reset link.</small>' : ""}
+          ${creating && p.turnstile ? '<div class="ts-box" id="tsBox"></div>' : ""}
           <div class="auth-err" id="authErr" role="alert" hidden></div>
           <button type="submit" class="btn primary" id="authGo">${creating ? "Create account" : "Sign in"}</button>
         </form>
@@ -729,7 +881,14 @@
           ${p.google ? `<a class="btn ghost" href="/auth/google?return=${encodeURIComponent("/#profile")}">Continue with Google</a>` : ""}
           ${p.dev ? `<form class="dev" id="devForm"><label class="sr" for="devName">Name</label><input id="devName" placeholder="Your name (local dev)" maxlength="40" required><button class="btn ghost" type="submit">Dev sign-in</button></form>` : ""}
         </div>` : ""}
+        <p class="p-note">How TalkHalifax handles your account and messages: <a href="#privacy">Privacy</a>.</p>
       </div>`;
+      if (creating && p.turnstile) loadTurnstile().then(() => {
+        if (!$("#tsBox")) return;
+        tsToken = "";
+        tsWidget = window.turnstile.render("#tsBox", { sitekey: p.turnstile, theme: "auto", size: "flexible",
+          callback: t => { tsToken = t; }, "expired-callback": () => { tsToken = ""; }, "error-callback": () => { tsToken = ""; } });
+      }).catch(() => { const e = $("#authErr"); if (e) { e.textContent = "The bot check didn't load. Check your connection and reload."; e.hidden = false; } });
       v.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => { authMode = b.dataset.mode; renderProfile(); $("#authUser").focus(); }));
       $("#authForm").addEventListener("submit", async e => {
         e.preventDefault();
@@ -737,13 +896,14 @@
         const username = $("#authUser").value.trim(), password = $("#authPass").value;
         const fail = t => { err.textContent = t; err.hidden = false; go.disabled = false; };
         if (!username || !password) return fail("Enter a username and password.");
+        if (creating && p.turnstile && !tsToken) return fail("Finish the check above the button first.");
         go.disabled = true; err.hidden = true;
         try {
           const r = await fetch(creating ? "/auth/signup" : "/auth/login", {
-            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }),
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password, turnstile: creating ? tsToken : undefined }),
           });
           const d = await r.json().catch(() => ({}));
-          if (!r.ok) return fail(d.error || "That didn't work. Try again.");
+          if (!r.ok) { if (creating) resetTurnstile(); return fail(d.error || "That didn't work. Try again."); }
           await loadMe();
           if (S.current === "profile") renderProfile();
         } catch (x) { fail("Can't reach TalkHalifax. Check your connection and try again."); }
@@ -762,19 +922,52 @@
         <div class="stat glass"><b>–</b><span>chats joined</span></div>
         <div class="stat glass"><b>–</b><span>in the last 24 hours</span></div>
       </div>
+      ${S.me.role === "moderator" ? `<h2 class="p-h">Reports</h2><div id="pReports"><p class="msg" style="border:0">Loading…</p></div>` : ""}
       ${S.me.role === "moderator" ? `<h2 class="p-h">Drafts waiting for review</h2><div id="pReview"><p class="msg" style="border:0">Loading…</p></div>` : ""}
       <h2 class="p-h">Your recent messages</h2>
       <ul class="activity" id="pActivity"><li class="msg" style="border:0">Loading…</li></ul>
       <h2 class="p-h">Settings</h2>
       <div class="setting"><span>Show the live chat when I open an article<small>On a phone it always starts tucked away at the bottom.</small></span>
         <button type="button" class="switch" id="chatPref" role="switch" aria-checked="${!chatHidden}" aria-label="Show the live chat when I open an article"></button></div>
+      ${S.me.password ? `<details class="setting-more"><summary>Change password</summary>
+        <form class="auth-form glass" id="pwForm" novalidate>
+          <input type="text" name="username" autocomplete="username" value="${esc(S.me.name || "")}" hidden>
+          <label for="pwCur">Current password</label>
+          <input id="pwCur" type="password" autocomplete="current-password" maxlength="200" required>
+          <label for="pwNew">New password</label>
+          <input id="pwNew" type="password" autocomplete="new-password" minlength="8" maxlength="200" required aria-describedby="pwHint">
+          <small id="pwHint">At least 8 characters. You stay signed in here; anywhere else is signed out.</small>
+          <div class="auth-err" id="pwErr" role="alert" hidden></div>
+          <button type="submit" class="btn primary" id="pwGo">Change password</button>
+        </form></details>` : ""}
       <button type="button" class="btn ghost signout" id="signOut">Sign out</button>
-      <p class="p-note">TalkHalifax stores your username, a scrambled (hashed) copy of your password, and your messages.</p>
+      <button type="button" class="btn ghost del-acct" id="delAcct">Delete my account</button>
+      <p class="p-note">TalkHalifax keeps your ${S.me.password ? "username, a scrambled (hashed) copy of your password" : "name, email and photo from Google"}, and what you post. <a href="#privacy">Privacy</a></p>
     </div>`;
     $("#pName").textContent = S.me.name || "You";
     $("#chatPref").addEventListener("click", e => { setChatHidden(!chatHidden); e.currentTarget.setAttribute("aria-checked", String(!chatHidden)); });
     $("#signOut").addEventListener("click", async () => { await fetch("/auth/logout", { method: "POST" }); location.href = "/"; });
-    if (S.me.role === "moderator") loadReview();
+    let delArmed = false;
+    $("#delAcct").addEventListener("click", async e => {
+      const b = e.currentTarget;
+      if (!delArmed) { delArmed = true; b.classList.add("danger-btn"); b.textContent = "Delete for good? Your messages and comments are erased too."; return; }
+      b.disabled = true;
+      const r = await fetch("/api/me", { method: "DELETE" }).catch(() => null);
+      if (r && r.ok) { location.href = "/"; return; }
+      b.disabled = false; b.textContent = "That didn't work. Tap to try again.";
+    });
+    const pw = $("#pwForm");
+    if (pw) pw.addEventListener("submit", async e => {
+      e.preventDefault();
+      const err = $("#pwErr"), go = $("#pwGo");
+      go.disabled = true; err.hidden = true;
+      const r = await fetch("/auth/password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ current: $("#pwCur").value, password: $("#pwNew").value }) }).catch(() => null);
+      const d = r ? await r.json().catch(() => ({})) : {};
+      go.disabled = false;
+      if (!r || !r.ok) { err.textContent = d.error || "Can't reach TalkHalifax. Check your connection and try again."; err.hidden = false; return; }
+      pw.reset(); err.textContent = "Password changed."; err.classList.add("ok"); err.hidden = false;
+    });
+    if (S.me.role === "moderator") { loadReports(); loadReview(); }
     try {
       const d = await getJSON("/api/me/messages");
       if (S.current !== "profile") return;
@@ -808,7 +1001,7 @@
         <button type="button" class="dr-link" data-go="articles"${here("articles")}>Articles</button>
         <button type="button" class="dr-link" data-go="notices"${here("notices")}>Notices${urgent ? `<span class="n">${urgent} URGENT</span>` : ""}</button>
       </nav>
-      <p class="dr-foot">Written by AI from official releases.</p>
+      <p class="dr-foot">Written by AI from official releases. <button type="button" class="by-link" data-go="privacy">Privacy</button></p>
     </div>`;
     $("#drClose").onclick = closeDrawer;
   }
@@ -833,7 +1026,7 @@
   $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
 
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
-  const VIEWS = ["home", "articles", "notices", "profile"];
+  const VIEWS = ["home", "articles", "notices", "profile", "privacy"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (v.startsWith("user-")) {
@@ -841,20 +1034,21 @@
       if (S.current !== "user" || S.user !== id) S.userFrom = S.current === "article" ? "article-" + S.article : S.current;
       S.user = id; v = "user";
     }
+    else if (v.startsWith("reset-")) { S.resetToken = v.slice(6); v = "reset"; }
     else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     S.current = v;
     renderBanners(); // Home only
-    for (const id of [...VIEWS, "article", "user"]) $("#" + id).hidden = v !== id;
+    for (const id of [...VIEWS, "article", "user", "reset"]) $("#" + id).hidden = v !== id;
     document.body.classList.toggle("wide-view", v === "article");
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
-  const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v;
+  const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v === "reset" ? "reset-" + S.resetToken : v;
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-article]");
     if (a) { e.preventDefault(); return goTo("article-" + a.dataset.article); }
@@ -874,6 +1068,7 @@
     if (S.current === "notices") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "profile") return loadMe();
     if (S.current === "user") return renderUser();
+    if (S.current === "reset" || S.current === "privacy") return;
     const id = S.article, before = S.full[id];
     let a;
     try { a = await fetchStory(id); } catch (e) { return; }
