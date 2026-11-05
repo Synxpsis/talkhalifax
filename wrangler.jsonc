@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   // newsroom/guidelines.md is bundled as text so agents can read it through the MCP get_guidelines tool
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
-  "compatibility_date": "2025-06-01",
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
 
   // The page and its assets. The Worker runs first so /api, /auth and /rooms never fall through to files.

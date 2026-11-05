@@ -32,7 +32,7 @@ features land on a codebase that can take them.
 
 **6a. Ground work**
 - Turnstile keys set by the editor, so sign-up has a bot check (**D3**).
-- Upgrade wrangler, workers-types and the compatibility date (**C3**).
+- ✅ Upgrade wrangler, workers-types and the compatibility date (**C3**).
 - Split `app.js` into modules and move the CSS to its own file, no bundler (**C4**).
 - First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI
   before deploy (**C1**, first slice).

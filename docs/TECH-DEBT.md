@@ -30,7 +30,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 |---|---|---|---|---|---|
 | C1 | **No automated tests.** CI type checks and parses `app.js`, then deploys. Nothing checks screening, auth, stage rules, approvals or the MCP tools. | Every push to `main` goes live untested, and agents will be making more of the changes | Add Vitest with `@cloudflare/vitest-pool-workers`. Start with the rules that protect facts and people: screening rules, check-in and stage timing, pending updates, bans, rate limits. Run them in CI before deploy | High | L |
 | C2 | ✅ **No check after a deploy, and no rollback step.** | A deploy that breaks the site stays broken until someone notices. Site reliability checks only every 6 hours | After `wrangler deploy`, curl `/`, `/api/stories` and `/api/weather`. If one fails, run `wrangler rollback` and fail the job | High | S |
-| C3 | **Tooling is over a year old.** wrangler 4.20.0 (latest 4.157), `@cloudflare/workers-types` 2025-06 (latest v5), TypeScript 5.8 (latest 7.0), `compatibility_date` 2025-06-01. | Missing fixes and newer features (for example Workers Static Assets options and better local D1). The longer we wait, the bigger the jump | Upgrade wrangler first, then workers-types and the compatibility date, testing locally after each step. Leave TypeScript 7 for later | Medium | M |
+| C3 | ✅ **Tooling is over a year old.** wrangler 4.20.0 (latest 4.157), `@cloudflare/workers-types` 2025-06 (latest v5), TypeScript 5.8 (latest 7.0), `compatibility_date` 2025-06-01. | Missing fixes and newer features (for example Workers Static Assets options and better local D1). The longer we wait, the bigger the jump | Upgrade wrangler first, then workers-types and the compatibility date, testing locally after each step. Leave TypeScript 7 for later | Medium | M |
 | C4 | **One big client file.** `public/app.js` (1,161 lines) holds every view, and `public/index.html` (627 lines) holds all the CSS. No build step. | Phase 6 (service worker, push, offline) adds more. Merges and reviews get harder | Split into ES modules served as static files (`views/`, `chat.js`, `api.js`) and move the CSS to `styles.css`. Still no bundler | Medium | M |
 | C5 | **`src/mcp.ts` keeps growing** (583 lines, 22 tools in one switch). | Every new source or agent adds to it | Split into `mcp/stories.ts`, `mcp/leads.ts`, `mcp/desk.ts` with a shared tool table | Low | M |
 | C6 | ✅ **Mixed line endings.** Some files are CRLF and some LF, and only `CLAUDE.md` records which. `sed -i` in Git Bash strips CRs. | Silent whole-file diffs, and agents break files | Add a `.gitattributes` (`* text=auto eol=lf`) and normalise once in a commit of its own | Medium | S |
@@ -53,6 +53,8 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 
 ## Paid off
 
+- **Nov. 5, 2026:** wrangler 4.158.0, `@cloudflare/workers-types` 5.20261104.1, TypeScript 5.9.3 and
+  `compatibility_date` 2026-10-01 (**C3**). TypeScript 7 is left for later.
 - **Nov. 5, 2026:** one line-ending rule, LF everywhere, enforced by `.gitattributes` (**C6**).
 - **Nov. 4, 2026:** live weather and outage notices are due a check-in every hour and listed by `conditions` as
   `openNotices` from any day (**N1**). The stale notice came from a day boundary: Nov. 4's `conditions` only knew
