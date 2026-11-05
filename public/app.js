@@ -1044,6 +1044,7 @@
     renderBanners(); // Home only
     for (const id of [...VIEWS, "article", "user", "reset"]) $("#" + id).hidden = v !== id;
     document.body.classList.toggle("wide-view", v === "article");
+    document.body.classList.toggle("transit-view", v === "transit");
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
@@ -1113,7 +1114,7 @@
     };
     document.addEventListener("touchstart", e => {
       const t = e.target;
-      if (busy || e.touches.length !== 1 || window.scrollY > 0 || t.closest(".chat, input, textarea, [contenteditable]")) { startY = null; return; }
+      if (busy || e.touches.length !== 1 || window.scrollY > 0 || t.closest(".chat, #transit, input, textarea, [contenteditable]")) { startY = null; return; }
       startY = e.touches[0].clientY; startX = e.touches[0].clientX; pull = 0;
     }, { passive: true });
     document.addEventListener("touchmove", e => {

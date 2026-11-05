@@ -63,7 +63,15 @@
       </div>
       <p class="tr-foot">Live data: <a href="https://www.halifax.ca/home/open-data" target="_blank" rel="noopener">Halifax Transit open data</a>, refreshed every 15 seconds. Positions can be a minute behind.</p>`;
     root.querySelector("#trRoute").addEventListener("change", e => setRoute(e.target.value));
+    // On phones the route bar and details sheet float over the map: keep the map's controls clear of them
+    const top = root.querySelector(".tr-top"), side = root.querySelector("#trSide");
+    const ro = new ResizeObserver(() => {
+      root.style.setProperty("--tr-top", top.offsetTop + top.offsetHeight + 8 + "px");
+      root.style.setProperty("--tr-sheet", root.offsetHeight - side.offsetTop + 8 + "px");
+    });
+    for (const el of [root.querySelector(".tr-body"), top, side]) ro.observe(el);
   }
+  const phone = matchMedia("(max-width: 760px)");
 
   function fillRoutes() {
     const sel = root.querySelector("#trRoute");
@@ -114,12 +122,13 @@
       html += `<p class="tr-hint">Tap a bus or ferry to see where it's going, or pick a route.</p>`;
     }
     if (route) html += alerts.length
-      ? `<h2 class="tr-h">Service alerts</h2><ul class="tr-alerts">${alerts.slice(0, 6).map(a => `<li><b>${esc(a.header)}</b>${a.description && a.description !== a.header ? `<span>${esc(a.description)}</span>` : ""}</li>`).join("")}</ul>${alerts.length > 6 ? `<p class="tr-hint">And ${alerts.length - 6} more.</p>` : ""}`
+      ? `<details class="tr-more"${T.alertsOpen ?? !phone.matches ? " open" : ""}><summary class="tr-h">Service alerts (${alerts.length})</summary><ul class="tr-alerts">${alerts.slice(0, 6).map(a => `<li><b>${esc(a.header)}</b>${a.description && a.description !== a.header ? `<span>${esc(a.description)}</span>` : ""}</li>`).join("")}</ul>${alerts.length > 6 ? `<p class="tr-hint">And ${alerts.length - 6} more.</p>` : ""}</details>`
       : `<p class="tr-hint">No service alerts for this route.</p>`;
     side.innerHTML = html;
     side.querySelector("#trClose")?.addEventListener("click", () => select(null));
     side.querySelector("#trOnly")?.addEventListener("click", () => setRoute(v.route));
     side.querySelector("#trAll")?.addEventListener("click", () => setRoute(""));
+    side.querySelector(".tr-more")?.addEventListener("toggle", e => { T.alertsOpen = e.target.open; });
   }
 
   // ---------- map ----------
@@ -219,7 +228,10 @@
     const coords = id ? (T.routes.find(r => r.id === id)?.shapes || []).flatMap(s => T.shapes[s] ? decodeLine(T.shapes[s]) : []) : [];
     if (coords.length) {
       const b = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
-      map.fitBounds(b, { padding: { top: 40, right: 60, bottom: 70, left: 40 }, maxZoom: 13.5, duration: animate ? 600 : 0 });
+      const top = root.querySelector(".tr-top"), side = root.querySelector("#trSide");
+      const pad = phone.matches ? { top: top.offsetTop + top.offsetHeight + 16, right: 50, bottom: root.offsetHeight - side.offsetTop + 16, left: 20 }
+        : { top: 40, right: 60, bottom: 70, left: 40 };
+      map.fitBounds(b, { padding: pad, maxZoom: 13.5, duration: animate ? 600 : 0 });
     } else if (!id && animate) map.easeTo({ ...HALIFAX, duration: 600 });
   }
 
@@ -298,6 +310,9 @@
     .tr-dl div { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
     .tr-dl dt { color: var(--muted); } .tr-dl dd { margin: 0; }
     .tr-btn { font: inherit; font-weight: 600; font-size: 14px; color: var(--ink); background: var(--field); border: 1px solid var(--glass-edge); border-radius: 999px; padding: 0 16px; min-height: 44px; cursor: pointer; }
+    .tr-more summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+    .tr-more summary::after { content: "▾"; margin-left: 6px; transition: transform .2s; } .tr-more[open] summary::after { transform: rotate(180deg); }
+    .tr-more summary::-webkit-details-marker { display: none; } .tr-more summary { list-style: none; }
     .tr-h { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
     .tr-alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
     .tr-alerts b { display: block; font-weight: 600; } .tr-alerts span { color: var(--muted); }
@@ -305,11 +320,26 @@
     .tr-foot { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
     .tr-foot a { color: inherit; }
     .maplibregl-ctrl-group { background: var(--field) !important; }
+    /* Phones: the map fills the screen under the header, with the route bar and the details sheet floating on it */
     @media (max-width: 760px) {
-      .tr-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; height: calc(100dvh - var(--hdr, 56px) - 150px); min-height: 380px; gap: 10px; }
-      .tr-side { max-height: 38dvh; padding: 14px; }
-      .tr-top h1 { font-size: 28px; }
-      .tr-pick, .tr-pick select { width: 100%; max-width: none; }
+      body.transit-view { overflow: hidden; }
+      body.transit-view footer { display: none; }
+      #transit { position: fixed; z-index: 5; inset: calc(env(safe-area-inset-top, 0px) + var(--hdr, 56px)) 0 0; max-width: none; margin: 0; padding: 0; }
+      .tr-body { display: block; position: absolute; inset: 0; height: auto; min-height: 0; }
+      #transit .tr-map { position: absolute; inset: 0; border: 0; border-radius: 0; } /* beats maplibregl-map's position: relative */
+      .tr-top, .tr-side { position: absolute; z-index: 2; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+        background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+      .tr-top { top: 10px; margin: 0; padding: 8px 8px 8px 14px; border-radius: var(--radius-l); flex-wrap: nowrap; align-items: center; gap: 10px; }
+      .tr-top > div { flex: 1; min-width: 0; }
+      .tr-top h1 { position: absolute; left: -9999px; }
+      .tr-status { font-size: 12.5px; line-height: 1.35; }
+      .tr-pick { flex: none; }
+      .tr-pick select { max-width: 44vw; }
+      .tr-side { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); max-height: 45%; padding: 12px 14px; border-radius: var(--radius-l); }
+      .tr-side .tr-hint:only-child { margin: 0; }
+      .tr-foot { display: none; }
+      .tr-map .maplibregl-ctrl-top-right { top: var(--tr-top, 70px); }
+      .tr-map .maplibregl-ctrl-bottom-right, .tr-map .maplibregl-ctrl-bottom-left { bottom: var(--tr-sheet, 60px); }
     }`;
   document.head.appendChild(style);
 })();
