@@ -48,6 +48,11 @@ features land on a codebase that can take them.
 - A preference for which kinds of alert, and quiet hours.
 - The editor's approval of a P0 notice is what sends the push. Nothing is pushed that a human hasn't approved.
 
+**6c½. Transit map** (v1 shipped Nov. 4)
+- ✅ Live buses and ferries, route filter, route lines, service alerts per route.
+- v2: tap a stop for its next arrivals, and early/late on each bus, from the TripUpdates feed (1.4 MB; measure the
+  Worker's CPU time first). Rebuild the schedule data automatically (**N8**).
+
 **6d. Polish**
 - Mobile: safe areas, chat keyboard handling, swipe back from a story, faster first load.
 - Desktop: reading width, chat docked beside the story, keyboard shortcuts.

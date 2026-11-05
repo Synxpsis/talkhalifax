@@ -6,6 +6,7 @@ import { mcp } from "./mcp";
 import { getWeather, refreshWeather } from "./weather";
 import { getAlerts, refreshAlerts } from "./alerts";
 import { telegramWebhook, tellEditor } from "./telegram";
+import { transit } from "./transit";
 export { ArticleRoom } from "./room";
 
 interface StoryRow {
@@ -152,6 +153,7 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
 
   if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
   if (path === "/api/alerts") return json({ alerts: await getAlerts(env, ctx) });
+  if (path.startsWith("/api/transit/")) return transit(path);
 
   // The newsroom (Claude) publishes and updates stories here, with its own token
   if (path.startsWith("/api/newsroom/")) return newsroom(req, env, url);

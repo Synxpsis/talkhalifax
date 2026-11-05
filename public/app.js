@@ -1000,6 +1000,7 @@
         <button type="button" class="dr-link" data-go="home"${here("home")}>Developing Stories${live ? `<span class="n">${live} LIVE</span>` : ""}</button>
         <button type="button" class="dr-link" data-go="articles"${here("articles")}>Articles</button>
         <button type="button" class="dr-link" data-go="notices"${here("notices")}>Notices${urgent ? `<span class="n">${urgent} URGENT</span>` : ""}</button>
+        <button type="button" class="dr-link" data-go="transit"${here("transit")}>Transit</button>
       </nav>
       <p class="dr-foot">Written by AI from official releases. <button type="button" class="by-link" data-go="privacy">Privacy</button></p>
     </div>`;
@@ -1026,7 +1027,7 @@
   $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
 
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
-  const VIEWS = ["home", "articles", "notices", "profile", "privacy"];
+  const VIEWS = ["home", "articles", "notices", "transit", "profile", "privacy"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (v.startsWith("user-")) {
@@ -1035,8 +1036,10 @@
       S.user = id; v = "user";
     }
     else if (v.startsWith("reset-")) { S.resetToken = v.slice(6); v = "reset"; }
+    else if (v.startsWith("transit")) { S.transitRoute = decodeURIComponent(v.slice(8)); v = "transit"; }
     else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
+    if (v !== "transit") window.THTransit?.close();
     S.current = v;
     renderBanners(); // Home only
     for (const id of [...VIEWS, "article", "user", "reset"]) $("#" + id).hidden = v !== id;
@@ -1044,11 +1047,18 @@
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "transit") openTransit(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
   }
+  // The Transit map lives in its own script (and MapLibre), loaded the first time someone opens it
+  let transitScript;
+  function openTransit() {
+    transitScript ||= new Promise((res, rej) => { const s = document.createElement("script"); s.src = "/transit.js"; s.onload = res; s.onerror = () => { transitScript = null; rej(); }; document.head.appendChild(s); });
+    transitScript.then(() => { if (S.current === "transit") window.THTransit.open($("#transit"), S.transitRoute || ""); })
+      .catch(() => { $("#transit").innerHTML = `<div class="msg">The transit map couldn't load. Check your connection and try again.</div>`; });
+  }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
-  const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v === "reset" ? "reset-" + S.resetToken : v;
+  const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v === "reset" ? "reset-" + S.resetToken : v === "transit" && S.transitRoute ? "transit-" + encodeURIComponent(S.transitRoute) : v;
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-article]");
     if (a) { e.preventDefault(); return goTo("article-" + a.dataset.article); }
@@ -1068,7 +1078,7 @@
     if (S.current === "notices") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "profile") return loadMe();
     if (S.current === "user") return renderUser();
-    if (S.current === "reset" || S.current === "privacy") return;
+    if (S.current === "reset" || S.current === "privacy" || S.current === "transit") return;
     const id = S.article, before = S.full[id];
     let a;
     try { a = await fetchStory(id); } catch (e) { return; }

@@ -529,6 +529,7 @@ img { max-width: 100%; }
       <button type="button" data-go="home">Developing Stories</button>
       <button type="button" data-go="articles">Articles</button>
       <button type="button" data-go="notices">Notices</button>
+      <button type="button" data-go="transit">Transit</button>
     </nav>
     <button class="me-btn" type="button" id="meBtn" aria-label="Your profile">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -544,6 +545,8 @@ img { max-width: 100%; }
     </div>
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>
   </section>
+
+  <section class="view wrap" id="transit" hidden></section>
 
   <section class="view wrap" id="articles" hidden>
     <div class="forum-top">
@@ -596,7 +599,7 @@ img { max-width: 100%; }
       <li>Moderators see reports, including the text that was reported.</li>
       <li>Messages and comments are checked before they appear, by fixed rules and by an AI model that Cloudflare runs, to keep out slurs, threats, hate and personal details.</li>
       <li>The newsroom's AI journalist (Claude, made by Anthropic) can read recent chat messages to decide what to look into. It never quotes them or treats them as facts.</li>
-      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor.</li>
+      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor. The Transit map loads its map library from unpkg and its map tiles from OpenFreeMap, which see your IP address like any website you visit; your location is used only if you tap the locate button, and only in your browser.</li>
       <li>We don't sell your data or share it with anyone else.</li>
     </ul>
 

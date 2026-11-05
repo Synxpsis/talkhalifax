@@ -7,6 +7,7 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 - `public/`: the page (`index.html`, `app.js`), served as static assets
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts
 - `src/alerts.ts`: the home page's Getting around list: halifax.ca road notices and Windsor Street Exchange work, Halifax Transit detours, and Environment Canada weather warnings, shown as posted with links (not rewritten)
+- `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). When Halifax Transit publishes a new schedule, run `node scripts/build-transit.mjs` and push
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing
 - `src/auth.ts`: sessions (HttpOnly cookie), Google sign-in, and a localhost-only dev sign-in
 - `migrations/`: the D1 schema. `scripts/articles/` plus `scripts/build-seed.mjs` load the current stories.

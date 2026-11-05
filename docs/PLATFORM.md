@@ -32,6 +32,7 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | Getting around | `src/alerts.ts` | halifax.ca road notices, Windsor Street Exchange, Transit detours, weather warnings |
 | Weather and tides | `src/weather.ts` | Environment Canada (api.weather.gc.ca) and DFO tides (api-iwls.dfo-mpo.gc.ca) |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
+| Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
 | Schema | `migrations/0001`–`0009` | D1 tables (below) |
 | Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, D1 migrations, `wrangler deploy` |
@@ -67,6 +68,8 @@ P3 `decisions`, P4 `community`.
 | Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
 | DFO tides | The tide widget | cron |
 | halifax.ca road notices, Transit detours | Getting around list (shown as posted, not rewritten) | cron |
+| Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
+| Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
 | Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
 | r/halifax | Signal: something may be happening | `trending` |
 
@@ -83,6 +86,9 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 
 - **Home**: developing stories as cards, sorted by latest or busiest, with live people counts; weather, tides,
   Getting around.
+- **Transit** (`#transit`, or `#transit-<route>`): a live map of every bus and ferry (MapLibre, OpenFreeMap tiles),
+  updated every 15 seconds. Pick a route to see only it and its line; tap a vehicle for its headsign, next stop, speed,
+  seats and the route's service alerts.
 - **Articles** and **Notices**: archived articles and current notices.
 - **Story**: the article or notice, its facts, version notes, the docked live chat (or comments once archived).
 - **Chat**: live messages, typing, presence, report (⚑), screening with the text handed back if turned away.

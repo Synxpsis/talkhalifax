@@ -78,6 +78,7 @@ text sizes must already be readable: 16px body minimum on inputs to stop iOS zoo
 | Component | Class | Notes |
 |---|---|---|
 | Header | `header`, `.name`, `.hnav`, `.me-btn` | Sticky glass bar under the safe area; the profile button opens the drawer |
+| Transit map | `.tr-*` (styles in `public/transit.js`) | Map and glass side panel; a bottom panel under 760px. Buses are `--ink` markers with a direction pointer, ferries `--signal-ok`. Positron or Dark map style follows the colour scheme |
 | Drawer | `.drawer`, `.dr-*` | Phone navigation and account, a native `<dialog>` |
 | Story card | `.card` (`.lead` spans 2) | Glass; kicker, headline, dek, pills, live viewer count |
 | Pill | `.pill` | Status labels (LIVE, Update, area) |
