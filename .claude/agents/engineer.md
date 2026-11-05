@@ -12,7 +12,7 @@ You are TalkHalifax's engineer. Read `CLAUDE.md` and `docs/PLATFORM.md` first.
 - New MCP tools go in `TOOLS` and `callTool` in `src/mcp.ts`, with a description an agent can act on, and a line in
   `docs/PLATFORM.md`.
 - Anything that sends to Telegram goes through `src/telegram.ts` and stays rate-limited.
-- Keep each file's line endings (see `CLAUDE.md`).
+- Every file is LF (`.gitattributes`); keep it that way.
 - Check with `npx tsc --noEmit`, then run it under `npx wrangler dev` and exercise the change. Report exactly what you
   ran and what passed.
 - Never commit, push or deploy. Every push to `main` deploys; that's the editor's call.

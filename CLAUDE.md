@@ -27,13 +27,11 @@ standards-keeper, docs-keeper).
   and `npx wrangler dev`, and exercise the change. Never test with accounts or posts on the live site.
 - Commit messages end with the Co-Authored-By line given in the session.
 
-## Line endings (they matter on this Windows checkout)
+## Line endings
 
-- **CRLF:** `public/*`, `src/index.ts`, `src/stories.ts`, `src/telegram.ts`, `newsroom/guidelines.md`
-- **LF:** the other `src/*.ts`, `scripts/*.mjs`, `docs/*`, `newsroom/routines/*`, `.claude/agents/*`
-
-Git Bash `sed -i` strips CR: after using it on a CRLF file, restore with `sed -i 's/\r*$/\r/' <file>`, and check with
-`file <path>`. Python on Windows writes CRLF in text mode unless you pass `newline='\n'`.
+Every file is LF, enforced by `.gitattributes` (`* text=auto eol=lf`). Python on Windows writes CRLF in text mode
+unless you pass `newline='
+'`; git converts it back on commit, but the working copy shows a whole-file diff until then.
 
 ## Local quirks
 

@@ -12,6 +12,6 @@ counts.
 - A rule must be something an agent can follow and a checker can verify. Replace vague words with tests ("under about
   110 characters", "copied exactly").
 - Keep the guidelines and the routine prompts consistent: if a rule moves, change every place that mentions it.
-  `newsroom/routines/journalist.md` mirrors the live routine; say when the routine itself needs updating.
-- Plain Canadian English, no em dashes. `newsroom/guidelines.md` uses CRLF line endings.
+  Each routine reads its `newsroom/routines/<name>.md` when it runs, so the file is the only copy.
+- Plain Canadian English, no em dashes.
 - Show the before and after of each change and why. Never commit or push.

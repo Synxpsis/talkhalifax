@@ -1,0 +1,2 @@
+# One rule for the whole repo: LF in git and in the working tree, on every OS
+* text=auto eol=lf

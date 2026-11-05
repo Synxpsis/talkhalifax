@@ -12,6 +12,6 @@ You are TalkHalifax's designer. Read `docs/DESIGN-SYSTEM.md` and `docs/VISION.md
   and both colour schemes.
 - Keep it quiet: glass on a near-white page, ink for actions, red and amber only for warnings.
 - Interface copy follows the doc's voice: plain, specific, no exclamation marks or em dashes.
-- `public/index.html` and `public/app.js` use CRLF line endings; keep them.
+- Every file is LF (`.gitattributes`); keep it that way.
 - Check your change in the browser at phone and desktop widths in both themes before reporting, and say what you saw.
 - Update `docs/DESIGN-SYSTEM.md` when you add or change a component or token. Never commit or push.

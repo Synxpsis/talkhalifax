@@ -1,15 +1,15 @@
 # TalkHalifax: roadmap
 
-_Last updated November 4, 2026. [VISION.md](VISION.md) says why, this file says what's next and in what order,
+_Last updated November 5, 2026. [VISION.md](VISION.md) says why, this file says what's next and in what order,
 and [TECH-DEBT.md](TECH-DEBT.md) has the items marked like **N1**._
 
 The order follows the principles: first keep facts right, then keep the site up, then make it feel native, then grow.
 Each milestone ends with a test that says it's done. Weeks are rough and assume part-time work with agents doing the
 building.
 
-## Now: finish Phase 5, the operating model (weeks of Nov. 4 and Nov. 11)
+## Done: Phase 5, the operating model (Nov. 4 and 5)
 
-The team is running. What's left is to stop stale facts reaching readers and to stop a broken deploy staying broken.
+The team is running, stale facts are caught within the hour, and a broken deploy rolls itself back.
 
 | Work | Debt | Done when |
 |---|---|---|
@@ -19,18 +19,19 @@ The team is running. What's left is to stop stale facts reaching readers and to 
 | ✅ The journalist reads its prompt from the repo like the other agents | N4 | Routine prompt is a pointer; `journalist.md` is the only copy |
 | ✅ A smoke test after every deploy, with automatic rollback | C2 | A deliberately broken deploy rolls itself back in CI |
 | ✅ The cron tells the editor when it keeps failing | D4 | Two failed weather or stage runs in a row send one Telegram note |
-| One line-ending rule for the whole repo | C6 | `.gitattributes` committed; no CRLF notes left in CLAUDE.md |
-| Turnstile keys set (editor) | D3 | Sign-up shows the check on the live site |
+| ✅ One line-ending rule for the whole repo | C6 | `.gitattributes` committed; no CRLF notes left in CLAUDE.md |
+| Turnstile keys set (editor) | D3 | Moved to 6a: the editor is setting them on Nov. 5 |
 
-**Exit test:** a week in which the standards editor finds no stale facts, the editor approves in minutes a day, and
+**Exit test** (watched through the week of Nov. 9 while Phase 6 starts): a week in which the standards editor finds no stale facts, the editor approves in minutes a day, and
 site reliability sends no alerts that weren't real.
 
-## Next: Phase 6, the native experience (late November to mid-December)
+## Now: Phase 6, the native experience (Nov. 5 to mid-December)
 
 Make TalkHalifax feel like an app on a phone and a calm reading room on a desktop. Do the ground work first so the new
 features land on a codebase that can take them.
 
 **6a. Ground work**
+- Turnstile keys set by the editor, so sign-up has a bot check (**D3**).
 - Upgrade wrangler, workers-types and the compatibility date (**C3**).
 - Split `app.js` into modules and move the CSS to its own file, no bundler (**C4**).
 - First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI
