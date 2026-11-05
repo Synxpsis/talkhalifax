@@ -82,7 +82,7 @@ text sizes must already be readable: 16px body minimum on inputs to stop iOS zoo
 | Events | `.ev-*` (styles in `public/events.js`) | Filter chips (`.nfilters`) for when and who, an area select, Highlights as story cards (photo only when the library has a real one, not its stock banners), then a day-by-day list: time, title, branch, audience pill, caution-coloured flags (Registration required, Full), Cancelled in warn colour and struck through. A row opens in place with details and the library link. Under 760px the chips scroll sideways |
 | Alerts | `.al-*` (styles in `public/alerts.js`) | The opt-in page: kinds as 44px checkboxes, quiet hours with hour selects, one ink button. `.al-offer` is the glass offer under a notice |
 | Offline bar | `.offline-bar` | Sticky caution band under the header while there's no connection |
-| App icon | `public/icons/` | A white speech bubble with "TH" on `--ink`. Rounded for `any`, full-bleed with an 80% safe zone for `maskable` and Apple's touch icon |
+| App icon | `public/icons/` | A Halifax skyline (lighthouse, the Macdonald Bridge, City Hall's clock tower, the Dominion Building, a church spire, towers behind) over the harbour, navy on pale blue, no words. Rounded for `any`; full-bleed with the skyline inside the 80% safe zone for `maskable`; square for Apple's touch icon; the 32 px favicon is cropped to the bridge and clock tower |
 | Drawer | `.drawer`, `.dr-*` | Phone navigation and account, a native `<dialog>` |
 | Story card | `.card` (`.lead` spans 2) | Glass; kicker, headline, dek, pills, live viewer count |
 | Pill | `.pill` | Status labels (LIVE, Update, area) |
