@@ -11,6 +11,8 @@ One human and a set of agents. Agents do the watching, writing, checking and rep
 - Approves or discards every new article and every change to a published story, from Telegram. The exception is a
   numbers-only change to a live weather or outage notice, which goes live at once and is reported after.
 - Approves sensitive stories (police, health, people named) before they publish.
+- Decides which new notices go out as push alerts: each live notice that someone has alerts on for arrives with
+  "Send alert" and "No alert" buttons. Nothing is pushed without that tap.
 - Handles reports, bans and reset links on the site.
 - Reads two briefings a day. Changes the guidelines and the agents' jobs.
 - Approves every push to `main` (each one deploys).
@@ -67,6 +69,7 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
 |---|---|---|
 | 📝 New article or notice waiting | Journalist (`publish_story`) | Approve / Discard |
 | ✏️ Change to a published story | Journalist, standards editor (`update_story`) | Approve / Discard |
+| 📣 Send this notice as a push alert? (only when some readers have that kind of alert on) | The Worker, when a notice goes live | Send alert / No alert |
 | 🔢 Updated without approval (new numbers on a live weather or outage notice) | Journalist, standards editor (`update_story`) | No |
 | 🛠 Site cron failed twice in a row (weather, alerts, stages, clean-up), then recovered | The Worker | No |
 | 🚩 First report on a message or comment | Readers | No (review on the site) |

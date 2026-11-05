@@ -79,6 +79,10 @@ text sizes must already be readable: 16px body minimum on inputs to stop iOS zoo
 |---|---|---|
 | Header | `header`, `.name`, `.hnav`, `.me-btn` | Sticky glass bar under the safe area; the profile button opens the drawer |
 | Transit map | `.tr-*` (styles in `public/transit.js`) | Map and glass side panel. Under 760px the map fills the screen below the header, with the route bar and a details sheet floating on it as glass (service alerts start folded). Buses are `--ink` markers with a direction pointer, ferries `--signal-ok`. Positron or Dark map style follows the colour scheme |
+| Events | `.ev-*` (styles in `public/events.js`) | Filter chips (`.nfilters`) for when and who, an area select, Highlights as story cards (photo only when the library has a real one, not its stock banners), then a day-by-day list: time, title, branch, audience pill, caution-coloured flags (Registration required, Full), Cancelled in warn colour and struck through. A row opens in place with details and the library link. Under 760px the chips scroll sideways |
+| Alerts | `.al-*` (styles in `public/alerts.js`) | The opt-in page: kinds as 44px checkboxes, quiet hours with hour selects, one ink button. `.al-offer` is the glass offer under a notice |
+| Offline bar | `.offline-bar` | Sticky caution band under the header while there's no connection |
+| App icon | `public/icons/` | A white speech bubble with "TH" on `--ink`. Rounded for `any`, full-bleed with an 80% safe zone for `maskable` and Apple's touch icon |
 | Drawer | `.drawer`, `.dr-*` | Phone navigation and account, a native `<dialog>` |
 | Story card | `.card` (`.lead` spans 2) | Glass; kicker, headline, dek, pills, live viewer count |
 | Pill | `.pill` | Status labels (LIVE, Update, area) |

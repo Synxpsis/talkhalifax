@@ -1,6 +1,6 @@
 # TalkHalifax: the platform as it is
 
-_A record of everything running on November 3, 2026 (commit `03d8739`, Phase 4). Update it when something changes._
+_A record of everything running on November 5, 2026 (Phase 6 under way). Update it when something changes._
 
 Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/talkhalifax.
 
@@ -33,9 +33,12 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | Weather and tides | `src/weather.ts` | Environment Canada (api.weather.gc.ca) and DFO tides (api-iwls.dfo-mpo.gc.ca) |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
+| Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them |
+| Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in on `/#alerts` (kinds, quiet hours). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
+| App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
-| Schema | `migrations/0001`–`0009` | D1 tables (below) |
-| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, D1 migrations, `wrangler deploy` |
+| Schema | `migrations/0001`–`0010` | D1 tables (below) |
+| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails |
 
 ## Content model
 
@@ -70,6 +73,7 @@ P3 `decisions`, P4 `community`.
 | halifax.ca road notices, Transit detours | Getting around list (shown as posted, not rewritten) | cron |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
 | Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
+| Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | `/api/events`, refreshed by the cron when over 3 hours old (about 16 requests) |
 | Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
 | r/halifax | Signal: something may be happening | `trending` |
 
@@ -90,6 +94,12 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
   updated every 15 seconds. Pick a route to see only it and its line; tap a vehicle for its headsign, next stop, speed,
   seats and the route's service alerts.
 - **Articles** and **Notices**: archived articles and current notices.
+- **Events** (`#events`): what's on at the libraries over the next two weeks, filtered by when, who it's for and area,
+  with Highlights from the library's featured events, special events and performances.
+- **Alerts** (`#alerts`): turn push alerts on for urgent notices, pick kinds (weather, outages, roads and transit,
+  police and emergencies, other) and quiet hours. Offered under a notice, never on a first visit.
+- **Installable and offline**: Add to Home Screen on phones, install on desktop. Without a connection the app opens,
+  shows an offline bar, and stories you've opened and the events list stay readable; chat waits for the connection.
 - **Story**: the article or notice, its facts, version notes, the docked live chat (or comments once archived).
 - **Chat**: live messages, typing, presence, report (⚑), screening with the text handed back if turned away.
 - **Profiles**: your own (messages, password change, delete account, moderator reports) and public ones (the journalist's
@@ -102,12 +112,14 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 
 `users`, `sessions`, `auth_throttle` (rate limits, cleared after a day), `stories`, `story_versions`, `room_stats`,
 `message_index` (a copy of every chat message), `comments`, `feeds` (cached weather and alerts), `leads`,
-`pending_updates`, `reports`, `password_resets`. Live chat history itself lives in each room's Durable Object storage.
+`pending_updates`, `reports`, `password_resets`, `push_subs` (one row per browser with alerts on: its push address,
+keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and `push_count` record a sent alert. Live chat history itself lives in each room's Durable Object storage.
 
 ## Secrets and settings
 
 On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
-`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (optional, not set yet).
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (optional, not set yet),
+`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, not set yet).
 In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` once there is one.
 GitHub repository secret: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
@@ -130,6 +142,7 @@ See [OPERATING-MODEL.md](OPERATING-MODEL.md) for what each one does. Debt and ga
 - **r/halifax returns HTTP 429** to the Worker (Reddit rate-limits Cloudflare's addresses), so the Reddit signal is
   usually missing. The journalist reports it and carries on.
 - **Turnstile is off** until a widget's keys are set. Sign-up has rate limits but no bot check.
-- **Library events** (the rest of Phase 3) aren't built.
-- Not yet an installable app: no web manifest, service worker or push notifications.
+- **The library's events feed refuses requests from the Worker** (HTTP 403, while the same request from a computer
+  works), so the Events tab may be empty on the live site. See TECH-DEBT **E1**.
+- **Push alerts aren't on** until the VAPID keys are set.
 - Cron expressions are in UTC, so routines run an hour later in Halifax local time from November to March.

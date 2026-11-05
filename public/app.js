@@ -315,7 +315,9 @@
     }
 
     if (a.kind === "notice") {
-      v.innerHTML = `<div class="room"><div>${back()}${articleHTML(a)}<p class="closed">Chat and comments are off for city notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p></div></div>`;
+      v.innerHTML = `<div class="room"><div>${back()}${articleHTML(a)}<p class="closed">Chat and comments are off for city notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p><div id="alertOffer"></div></div></div>`;
+      // Readers are offered alerts after opening a notice, never on a first visit to the site
+      lazy("/alerts.js").then(() => { const o = $("#alertOffer"); if (o) window.THAlerts.offer(o); }).catch(() => {});
       wireStageTools(); window.scrollTo({ top: 0 }); return;
     }
 
@@ -581,6 +583,8 @@
     });
     ws.addEventListener("close", () => {
       if (room.ws !== ws || room.closing) return;
+      // Offline: wait for the connection to come back (the "online" listener reconnects)
+      if (!navigator.onLine) { showChatError("You're offline. Chat reconnects when you're back online."); return; }
       // Reconnect with backoff while the person is still in this room
       const wait = Math.min(15000, 1000 * 2 ** room.tries++);
       showChatError("Reconnecting…");
@@ -591,7 +595,7 @@
     room.error = t;
     const e = $("#chatErr");
     if (e) { e.hidden = !t; e.textContent = t; }
-    if (t && t !== "Reconnecting…") setTimeout(() => { if (room.error === t) showChatError(""); }, 6000);
+    if (t && t !== "Reconnecting…" && navigator.onLine) setTimeout(() => { if (room.error === t) showChatError(""); }, 6000);
   }
 
   function renderChat(toBottom) {
@@ -1000,7 +1004,9 @@
         <button type="button" class="dr-link" data-go="home"${here("home")}>Developing Stories${live ? `<span class="n">${live} LIVE</span>` : ""}</button>
         <button type="button" class="dr-link" data-go="articles"${here("articles")}>Articles</button>
         <button type="button" class="dr-link" data-go="notices"${here("notices")}>Notices${urgent ? `<span class="n">${urgent} URGENT</span>` : ""}</button>
+        <button type="button" class="dr-link" data-go="events"${here("events")}>Events</button>
         <button type="button" class="dr-link" data-go="transit"${here("transit")}>Transit</button>
+        <button type="button" class="dr-link" data-go="alerts"${here("alerts")}>Alerts</button>
       </nav>
       <p class="dr-foot">Written by AI from official releases. <button type="button" class="by-link" data-go="privacy">Privacy</button></p>
     </div>`;
@@ -1027,7 +1033,7 @@
   $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
 
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
-  const VIEWS = ["home", "articles", "notices", "transit", "profile", "privacy"];
+  const VIEWS = ["home", "articles", "notices", "events", "transit", "alerts", "profile", "privacy"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (v.startsWith("user-")) {
@@ -1048,7 +1054,7 @@
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "transit") openTransit(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "transit") openTransit(); else if (v === "events") openEvents(); else if (v === "alerts") openAlerts(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
   }
   // The Transit map lives in its own script (and MapLibre), loaded the first time someone opens it
@@ -1057,6 +1063,20 @@
     transitScript ||= new Promise((res, rej) => { const s = document.createElement("script"); s.src = "/transit.js"; s.onload = res; s.onerror = () => { transitScript = null; rej(); }; document.head.appendChild(s); });
     transitScript.then(() => { if (S.current === "transit") window.THTransit.open($("#transit"), S.transitRoute || ""); })
       .catch(() => { $("#transit").innerHTML = `<div class="msg">The transit map couldn't load. Check your connection and try again.</div>`; });
+  }
+  // Events and alerts live in their own scripts too, loaded the first time they're needed
+  const scripts = {};
+  const lazy = src => scripts[src] ||= new Promise((res, rej) => {
+    const s = document.createElement("script"); s.src = src; s.onload = res;
+    s.onerror = () => { delete scripts[src]; rej(); }; document.head.appendChild(s);
+  });
+  function openEvents() {
+    lazy("/events.js").then(() => { if (S.current === "events") window.THEvents.open($("#events")); })
+      .catch(() => { $("#events").innerHTML = `<div class="msg">The events list couldn't load. Check your connection and try again.</div>`; });
+  }
+  function openAlerts() {
+    lazy("/alerts.js").then(() => { if (S.current === "alerts") window.THAlerts.open($("#alerts")); })
+      .catch(() => { $("#alerts").innerHTML = `<div class="msg">The alerts page couldn't load. Check your connection and try again.</div>`; });
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
   const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v === "reset" ? "reset-" + S.resetToken : v === "transit" && S.transitRoute ? "transit-" + encodeURIComponent(S.transitRoute) : v;
@@ -1079,6 +1099,7 @@
     if (S.current === "notices") return Promise.all([loadStories(), loadAlerts()]);
     if (S.current === "profile") return loadMe();
     if (S.current === "user") return renderUser();
+    if (S.current === "events") return window.THEvents?.refresh();
     if (S.current === "reset" || S.current === "privacy" || S.current === "transit") return;
     const id = S.article, before = S.full[id];
     let a;
@@ -1162,6 +1183,26 @@
     renderMeButton();
     if (S.current === "profile") renderProfile();
     if (S.current === "article") renderComposer();
+  }
+
+  // ---------- Offline and installed ----------
+  const offlineBar = document.createElement("div");
+  offlineBar.className = "offline-bar"; offlineBar.setAttribute("role", "status");
+  offlineBar.textContent = "You're offline. Stories you've opened on this device are still here; chat comes back when you're online.";
+  document.querySelector("header").after(offlineBar);
+  const net = () => { offlineBar.hidden = navigator.onLine; document.body.classList.toggle("is-offline", !navigator.onLine); };
+  net();
+  window.addEventListener("offline", net);
+  window.addEventListener("online", () => {
+    net(); showChatError("");
+    loadStories(); loadAlerts();
+    const a = S.current === "article" && S.full[S.article];
+    if (a && a.kind === "article" && a.stage === "developing") { room.id = null; connectRoom(S.article); }
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+    // A tapped push alert, when the page couldn't be navigated directly
+    navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.t === "go") location.href = e.data.url; });
   }
 
   show(location.hash.slice(1) || "home");

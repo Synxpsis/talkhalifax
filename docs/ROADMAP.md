@@ -37,17 +37,24 @@ features land on a codebase that can take them.
 - First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI
   before deploy (**C1**, first slice).
 
-**6b. Installable and offline**
-- A web manifest, icons and a splash colour, following [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md).
-- A service worker: the app shell always loads, and the stories you've opened stay readable offline, with a clear
+**6b. Installable and offline** (built Nov. 5)
+- ✅ A web manifest, icons and a splash colour, following [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md).
+- ✅ A service worker: the app shell always loads, and the stories you've opened stay readable offline, with a clear
   "offline" state on chat.
-- "Add to Home Screen" works on iOS and Android, and desktop install works in Chrome and Edge.
+- "Add to Home Screen" works on iOS and Android, and desktop install works in Chrome and Edge. Checked in Edge;
+  still to try on a real iPhone and Android phone.
 
-**6c. Push alerts for P0**
-- Web Push (VAPID keys as Worker secrets) for P0 notices: weather warnings, big outages, road closures. Opt-in only,
-  asked after a reader opens a notice, never on first visit.
-- A preference for which kinds of alert, and quiet hours.
-- The editor's approval of a P0 notice is what sends the push. Nothing is pushed that a human hasn't approved.
+**6c. Push alerts for P0** (built Nov. 5; on once the editor sets the VAPID keys)
+- ✅ Web Push (VAPID keys as Worker secrets) for urgent notices. Opt-in only, offered after a reader opens a notice,
+  never on first visit.
+- ✅ A preference for which kinds of alert, and quiet hours.
+- ✅ The editor's "Send alert" tap on Telegram is what sends the push. Nothing is pushed that a human hasn't approved.
+- Before alerts have more than about 40 subscribers: move sending to a Queue (**C7**).
+
+**6c¾. Events tab** (built Nov. 5, pulled forward from Phase 7)
+- ✅ Halifax Public Libraries' events for the next two weeks: filters, Highlights, day-by-day list.
+- The library's feed refuses the Worker (**E1**): agree access with the library, or fetch it another way the editor
+  approves. Then add halifax.ca's events calendar once it has a feed.
 
 **6c½. Transit map** (v1 shipped Nov. 4)
 - ✅ Live buses and ferries, route filter, route lines, service alerts per route.
@@ -70,7 +77,7 @@ and the editor picks.
 
 - Halifax Transit service alerts (beyond detours) and Halifax Water notices (boil orders, main breaks) as P0 notices.
 - Nova Scotia Health releases that name Halifax-area sites.
-- Library and community events (the rest of Phase 3), shown as a "This week" list, not as stories.
+- More event calendars beside the library's (halifax.ca once it has a feed, other official ones the scout finds).
 - Fix or drop the Reddit signal (**N5**).
 - Grow the tests to cover every source parser as it's added (**C1**), and split `mcp.ts` (**C5**).
 - Data retention for chat decided and on the privacy page (**D1**); restore runbook tried once (**D2**).

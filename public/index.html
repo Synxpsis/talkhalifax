@@ -7,6 +7,14 @@
 <meta name="theme-color" content="#f5f6f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1d1f" media="(prefers-color-scheme: dark)">
 <title>TalkHalifax</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TalkHalifax">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Halifax news, rewritten as short articles with a live chat in each one.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -305,6 +313,8 @@ body.chat-open #article.wide { padding-right: calc(var(--chatw) + max(28px, env(
 .send:disabled { opacity: .35; cursor: default; }
 .chat-note { padding: 12px 16px 14px; border-top: 1px solid var(--glass-edge); font-size: 13.5px; color: var(--muted); }
 .chat-err { color: var(--warn); font-size: 12.5px; padding: 0 16px 6px; }
+.offline-bar { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--hdr, 64px)); z-index: 8; padding: 8px 16px; font-size: 13.5px; text-align: center; color: var(--ink); background: var(--banner-caution); border-bottom: 1px solid var(--line); }
+.offline-bar[hidden] { display: none; }
 
 footer { border-top: 1px solid var(--line); }
 footer .wrap { padding-block: 22px 32px; font-size: 13px; color: var(--muted); }
@@ -529,6 +539,7 @@ img { max-width: 100%; }
       <button type="button" data-go="home">Developing Stories</button>
       <button type="button" data-go="articles">Articles</button>
       <button type="button" data-go="notices">Notices</button>
+      <button type="button" data-go="events">Events</button>
       <button type="button" data-go="transit">Transit</button>
     </nav>
     <button class="me-btn" type="button" id="meBtn" aria-label="Your profile">
@@ -546,7 +557,11 @@ img { max-width: 100%; }
     <div class="cards" id="devCards"><div class="msg">Loading…</div></div>
   </section>
 
+  <section class="view wrap" id="events" hidden></section>
+
   <section class="view wrap" id="transit" hidden></section>
+
+  <section class="view wrap" id="alerts" hidden></section>
 
   <section class="view wrap" id="articles" hidden>
     <div class="forum-top">
@@ -565,6 +580,7 @@ img { max-width: 100%; }
   <section class="view wrap" id="notices" hidden>
     <div class="forum-top">
       <h1>Notices</h1>
+      <button type="button" class="sort" data-go="alerts">Get alerts</button>
     </div>
     <div class="nfilters" role="group" aria-label="Show notices about" id="nFilters"></div>
     <div class="ncards" id="nActive"><div class="msg">Loading…</div></div>
@@ -590,7 +606,8 @@ img { max-width: 100%; }
       <li><b>What you post.</b> Your chat messages and comments, and any reports you make.</li>
       <li><b>One cookie</b> that keeps you signed in for 30 days. There are no advertising or tracking cookies, and no analytics.</li>
       <li><b>Your connection's IP address</b>, briefly, to slow down mass sign-ups and password guessing. It's deleted within a day.</li>
-      <li>Settings, like whether the chat starts open, stay in your own browser.</li>
+      <li><b>If you turn on alerts</b>, your browser's alert address (a link to its push service, such as Google's, Apple's or Mozilla's), the keys that let us encrypt alerts to it, and the kinds of alert and quiet hours you picked. Nothing ties these to your name or account.</li>
+      <li>Settings, like whether the chat starts open or your event filters, stay in your own browser. So do the stories you've opened, kept for offline reading.</li>
     </ul>
 
     <h2>Who sees it</h2>
@@ -599,7 +616,7 @@ img { max-width: 100%; }
       <li>Moderators see reports, including the text that was reported.</li>
       <li>Messages and comments are checked before they appear, by fixed rules and by an AI model that Cloudflare runs, to keep out slurs, threats, hate and personal details.</li>
       <li>The newsroom's AI journalist (Claude, made by Anthropic) can read recent chat messages to decide what to look into. It never quotes them or treats them as facts.</li>
-      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor. The Transit map loads its map library from unpkg and its map tiles from OpenFreeMap, which see your IP address like any website you visit; your location is used only if you tap the locate button, and only in your browser.</li>
+      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor. The Transit map loads its map library from unpkg and its map tiles from OpenFreeMap, which see your IP address like any website you visit; your location is used only if you tap the locate button, and only in your browser. The Events tab lists events from Halifax Public Libraries; its links take you to the library's site. Alerts travel through your browser's own push service, which sees the encrypted alert but can't read it.</li>
       <li>We don't sell your data or share it with anyone else.</li>
     </ul>
 
@@ -610,9 +627,10 @@ img { max-width: 100%; }
     <ul>
       <li>Delete any of your messages or comments yourself, at any time.</li>
       <li>Change your password from your profile. If you're locked out, a moderator can send you a one-time reset link.</li>
+      <li>Turn alerts off on the Alerts page and your alert address is deleted at once. Blocking notifications in your browser stops them too; the address is deleted the next time an alert can't be delivered.</li>
       <li>Delete your account from your profile. Your messages and comments are erased, your account is emptied, and you're signed out everywhere.</li>
     </ul>
-    <p class="forum-foot">Last updated November 3, 2026.</p>
+    <p class="forum-foot">Last updated November 5, 2026.</p>
   </section>
 
 </main>

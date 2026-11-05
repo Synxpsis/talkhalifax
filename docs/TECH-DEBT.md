@@ -1,6 +1,6 @@
 # TalkHalifax: tech debt
 
-_Last reviewed November 4, 2026 (commit `95532c1`). Re-check every few weeks, and move items to "Paid off" when they land._
+_Last reviewed November 5, 2026. Re-check every few weeks, and move items to "Paid off" when they land._
 
 Things that work today but will cost us later: shortcuts, gaps and risks. Each item has a priority:
 
@@ -22,6 +22,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 | N5 | **r/halifax returns HTTP 429** to the Worker most of the time. | The Reddit signal is usually missing | Fetch it from the routine (not the Worker), or use Reddit's API with an app token. Or drop it, since it's only a signal | Low | M |
 | N6 | **Cron times are UTC.** Routines run an hour later in Halifax from November to March. | Briefings land at 7 a.m. in winter and 8 a.m. in summer | Change the crons twice a year (put a reminder in OPERATING-MODEL.md), or let the briefing say its own time | Low | S |
 | N8 | **The transit schedule data expires.** `src/transit-data.json` and `public/transit/shapes.json` come from the GTFS schedule valid until Nov. 29, 2026. After a new schedule, new trips have no headsign or line on the map (positions still show). | The map gets vaguer at each service change | Run `node scripts/build-transit.mjs` and push when Halifax Transit publishes; better, a weekly GitHub Action that rebuilds and opens a PR when it changes | Medium | M |
+| E1 | **The library's events feed refuses the Worker.** `gateway.bibliocommons.com` answers the Worker's request with a bare 403, while the same request from Node or curl on a computer gets the feed. Local runs use data loaded by hand. | The Events tab may be empty on the live site | Ask Halifax Public Libraries for access for TalkHalifax (or whether there's a feed meant for this), or have a scheduled job outside Cloudflare fetch it and post it to the Worker, if the editor is comfortable with that. Don't disguise the Worker's requests | High | M |
 | N7 | **The seed articles are out of date.** `scripts/articles/` holds 9 October stories for local runs. | Local testing doesn't look like the live site (no notices, RCMP or conditions stories) | Replace them with a handful of current stories of each kind, exported from the live site | Low | S |
 
 ## Code and tooling
@@ -33,6 +34,8 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 | C3 | ✅ **Tooling is over a year old.** wrangler 4.20.0 (latest 4.157), `@cloudflare/workers-types` 2025-06 (latest v5), TypeScript 5.8 (latest 7.0), `compatibility_date` 2025-06-01. | Missing fixes and newer features (for example Workers Static Assets options and better local D1). The longer we wait, the bigger the jump | Upgrade wrangler first, then workers-types and the compatibility date, testing locally after each step. Leave TypeScript 7 for later | Medium | M |
 | C4 | **One big client file.** `public/app.js` (1,161 lines) holds every view, and `public/index.html` (627 lines) holds all the CSS. No build step. | Phase 6 (service worker, push, offline) adds more. Merges and reviews get harder | Split into ES modules served as static files (`views/`, `chat.js`, `api.js`) and move the CSS to `styles.css`. Still no bundler | Medium | M |
 | C5 | **`src/mcp.ts` keeps growing** (583 lines, 22 tools in one switch). | Every new source or agent adds to it | Split into `mcp/stories.ts`, `mcp/leads.ts`, `mcp/desk.ts` with a shared tool table | Low | M |
+| C7 | **Push alerts are sent from one request.** A Worker request can make only 50 outgoing requests on the Free plan (1,000 on Paid), and each alert is one. | Past about 40 subscribers on Free, some won't get an alert | Send through a Cloudflare Queue in batches, or move to the Paid plan. Check which plan the account is on | Medium | M |
+| C8 | **The service worker's caches are versioned by hand** (`VERSION` in `public/sw.js`). Everything is network-first, so deploys show up anyway, but a change to what's cached needs the version bumped. | Old cached files can linger offline | Bump `VERSION` when the cached file list changes; later, stamp it at deploy | Low | S |
 | C6 | ✅ **Mixed line endings.** Some files are CRLF and some LF, and only `CLAUDE.md` records which. `sed -i` in Git Bash strips CRs. | Silent whole-file diffs, and agents break files | Add a `.gitattributes` (`* text=auto eol=lf`) and normalise once in a commit of its own | Medium | S |
 
 ## Data, privacy and operations

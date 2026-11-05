@@ -1,5 +1,5 @@
 import { Env, User, json, randomId } from "./env";
-import { approvalOn, sendDraft, sendUpdate, tellEditor } from "./telegram";
+import { approvalOn, offerPush, sendDraft, sendUpdate, tellEditor } from "./telegram";
 import { screen } from "./screen";
 
 // ---------- When a developing story moves down to Articles ----------
@@ -117,7 +117,11 @@ export async function saveStory(env: Env, id: string, input: Record<string, unkn
        VALUES (?, ${names.map(() => "?").join(", ")}, ?, ?, ?, '', 1, ?)`,
     ).bind(id, ...names.map(n => cols[n]), stage, now, now, now).run();
     await snapshot(env, id, 1, note || (stage === "draft" ? "Drafted for review" : "Published"), author);
-    if (stage !== "draft") return { id, version: 1, created: true, stage };
+    if (stage !== "draft") {
+      // A new live notice: the editor decides on Telegram whether it goes out as a push alert
+      const alert = cols.kind === "notice" ? await offerPush(env, id) : undefined;
+      return { id, version: 1, created: true, stage, ...(alert ? { alert } : {}) };
+    }
     return { id, version: 1, created: true, stage, telegram: await sendDraft(env, id),
       next: "Waiting for the editor's approval. Call await_review with this id until it's approved or discarded." };
   }
@@ -203,7 +207,12 @@ export async function reviewDraft(env: Env, id: string, action: "approve" | "dis
   const res = action === "approve"
     ? await env.DB.prepare("UPDATE stories SET stage = 'developing', developing_since = ?, updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, now, id).run()
     : await env.DB.prepare("UPDATE stories SET stage = 'discarded', updated_at = ? WHERE id = ? AND stage = 'draft'").bind(now, id).run();
-  return !!res.meta.changes;
+  if (!res.meta.changes) return false;
+  if (action === "approve") {
+    const s = await env.DB.prepare("SELECT kind FROM stories WHERE id = ?").bind(id).first<{ kind: string }>();
+    if (s?.kind === "notice") await offerPush(env, id);
+  }
+  return true;
 }
 
 /** The editor's decision on a held update. Claims it first, so a double tap can't apply it twice. */

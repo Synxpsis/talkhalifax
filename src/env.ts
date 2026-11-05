@@ -18,6 +18,9 @@ export interface Env {
   /** Cloudflare Turnstile on sign-up. The site key is public (a var); the secret is a secret. Both set turns it on. */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
+  /** Web Push (VAPID) keys, base64url, for alerts on urgent notices. Both secrets; `node scripts/vapid-keys.mjs` sets them. */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
   /** "1" enables the localhost-only dev sign-in. Set in .dev.vars, never in production. */
   DEV_LOGIN?: string;
 }

@@ -8,6 +8,8 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts
 - `src/alerts.ts`: the home page's Getting around list: halifax.ca road notices and Windsor Street Exchange work, Halifax Transit detours, and Environment Canada weather warnings, shown as posted with links (not rewritten)
 - `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). When Halifax Transit publishes a new schedule, run `node scripts/build-transit.mjs` and push
+- `src/events.ts` and `public/events.js`: the Events tab, from Halifax Public Libraries' events feed (the next two weeks)
+- `src/push.ts`, `public/alerts.js` and `public/sw.js`: push alerts for urgent notices (sent only when the editor taps "Send alert" on Telegram), and the service worker that also keeps the app readable offline. `public/manifest.webmanifest` and `public/icons/` make it installable
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing
 - `src/auth.ts`: sessions (HttpOnly cookie), Google sign-in, and a localhost-only dev sign-in
 - `migrations/`: the D1 schema. `scripts/articles/` plus `scripts/build-seed.mjs` load the current stories.
@@ -38,6 +40,7 @@ Secrets live on the Worker, not in the repo:
 - `NEWSROOM_TOKEN`: lets the newsroom publish (`npx wrangler secret put NEWSROOM_TOKEN`; keep a copy in `.newsroom-token` for `scripts/newsroom.mjs`)
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: optional; Google sign-in stays off without them
 - `TURNSTILE_SECRET`: optional, with the public `TURNSTILE_SITE_KEY` var in `wrangler.jsonc`; sign-up asks for Cloudflare's bot check only when both are set
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: push alerts stay off without them. Make and store both with `node scripts/vapid-keys.mjs` (run it once: a new pair turns everyone's alerts off). For a local run, pass test keys with `--var`
 
 Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc`.
 
@@ -56,7 +59,3 @@ Stories follow [newsroom/guidelines.md](newsroom/guidelines.md). Agents work thr
 **The agents** are Claude Code cloud routines on the Claude plan (no Anthropic API key). They clone this repo and use `scripts/newsroom.mjs tool …`, because routines can't attach a custom MCP server. The journalist, "TalkHalifax journalist", runs at five past every hour: it files new releases from halifax.ca, the province and Halifax-area RCMP, plus live weather warnings and outages, as leads; works up to 5 leads in priority order; and checks in on up to 5 developing stories. The other jobs (desk editor, standards editor, site reliability, source scout) and their schedules are in [docs/OPERATING-MODEL.md](docs/OPERATING-MODEL.md); each one's prompt is in `newsroom/routines/`. Routines are managed at claude.ai/code/routines. They need, in their cloud environment:
 - an environment variable `TALKHALIFAX_TOKEN` set to the newsroom token
 - network access to `talkhalifax.alexwmmolloy.workers.dev`
-
-## Not built yet
-
-Library events (the rest of Phase 3).

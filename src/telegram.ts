@@ -3,6 +3,7 @@
 // Secrets: TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_CHAT_ID (the editor's chat; the bot tells you it on /start).
 import { Env, json } from "./env";
 import { newsroomAuthorized, reviewDraft, reviewUpdate } from "./stories";
+import { KIND_LABELS, alertKind, countRecipients, pushOn, sendNotice } from "./push";
 
 const SITE = "https://talkhalifax.alexwmmolloy.workers.dev";
 const html = (s: unknown) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
@@ -66,6 +67,29 @@ export async function sendDraft(env: Env, id: string): Promise<string> {
 export async function tellEditor(env: Env, text: string) {
   if (!approvalOn(env)) return;
   await tg(env, "sendMessage", { chat_id: env.TELEGRAM_CHAT_ID, text, parse_mode: "HTML", link_preview_options: { is_disabled: true } }).catch(() => {});
+}
+
+/** Offer to send a live notice as a push alert. Only the editor's tap sends it. Returns what happened, for the journalist. */
+export async function offerPush(env: Env, id: string): Promise<string | undefined> {
+  if (!approvalOn(env) || !pushOn(env)) return;
+  const s = await env.DB.prepare("SELECT rowid AS n, id, headline, section, push_sent_at FROM stories WHERE id = ?")
+    .bind(id).first<{ n: number; id: string; headline: string; section: string; push_sent_at: number | null }>();
+  if (!s || s.push_sent_at) return;
+  const kind = alertKind(s), people = await countRecipients(env, kind);
+  if (!people) return "No one has alerts on for this kind of notice, so the editor wasn't asked.";
+  try {
+    await tg(env, "sendMessage", {
+      chat_id: env.TELEGRAM_CHAT_ID, parse_mode: "HTML", link_preview_options: { is_disabled: true },
+      text: `📣 <b>Send this notice as a push alert?</b>
+
+<b>${html(s.headline)}</b>
+${html(KIND_LABELS[kind])}: ${people} ${people === 1 ? "device has" : "devices have"} these alerts on.
+
+<a href="${SITE}/#article-${encodeURIComponent(s.id)}">The notice</a>`,
+      reply_markup: { inline_keyboard: [[{ text: `📣 Send alert to ${people}`, callback_data: `pu:${s.n}` }, { text: "No alert", callback_data: `px:${s.n}` }]] },
+    });
+    return "The editor was asked on Telegram whether to send it as a push alert.";
+  } catch (e) { return `Couldn't ask the editor about a push alert: ${(e as Error).message}`; }
 }
 
 const buttons = (approve: string, discard: string) =>
@@ -135,8 +159,9 @@ export async function telegramWebhook(req: Request, env: Env, url: URL): Promise
 
   const cq = u.callback_query;
   if (cq) {
-    const m = String(cq.data || "").match(/^(ap|dc|up|ux):(\d+)$/);
+    const m = String(cq.data || "").match(/^(ap|dc|up|ux|pu|px):(\d+)$/);
     if (!m || !editor(cq.message?.chat?.id)) { await tg(env, "answerCallbackQuery", { callback_query_id: cq.id }); return json({ ok: true }); }
+    if (m[1] === "pu" || m[1] === "px") return pushDecision(env, cq, Number(m[2]), m[1] === "pu");
     const approve = m[1] === "ap" || m[1] === "up", isUpdate = m[1] === "up" || m[1] === "ux";
     let note: string | undefined, done = false;
     if (isUpdate) {
@@ -159,5 +184,28 @@ export async function telegramWebhook(req: Request, env: Env, url: URL): Promise
     await tg(env, "editMessageReplyMarkup", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {});
     await tg(env, "sendMessage", { chat_id: cq.message.chat.id, text: note, parse_mode: "HTML", reply_parameters: { message_id: cq.message.message_id } });
   }
+  return json({ ok: true });
+}
+
+/** The editor's tap on a push offer. Claims the notice first, so a double tap can't send it twice. */
+async function pushDecision(env: Env, cq: any, n: number, send: boolean): Promise<Response> {
+  const s = await env.DB.prepare("SELECT id, headline, stage, push_sent_at FROM stories WHERE rowid = ?").bind(n).first<{ id: string; headline: string; stage: string; push_sent_at: number | null }>();
+  let note: string, toast: string;
+  if (!s) { note = "That notice no longer exists."; toast = "Gone"; }
+  else if (s.push_sent_at) { note = "Already handled: this notice was sent as an alert before."; toast = "Already sent"; }
+  else if (!send) { note = `No alert sent for: ${html(s.headline)}`; toast = "No alert"; }
+  else if (s.stage !== "developing") { note = "That notice isn't live any more, so no alert was sent."; toast = "Not live"; }
+  else {
+    const claim = await env.DB.prepare("UPDATE stories SET push_sent_at = ? WHERE rowid = ? AND push_sent_at IS NULL").bind(Date.now(), n).run();
+    if (!claim.meta.changes) { note = "Already handled: this notice was sent as an alert before."; toast = "Already sent"; }
+    else {
+      const r = await sendNotice(env, s.id);
+      note = r.error ? `⚠️ ${html(r.error)}` : `📣 Alert sent to ${r.sent} ${r.sent === 1 ? "device" : "devices"}${r.failed ? `, ${r.failed} didn't answer` : ""}${r.removed ? `, ${r.removed} had turned alerts off` : ""}: ${html(s.headline)}`;
+      toast = r.error ? "Not sent" : `Sent to ${r.sent}`;
+    }
+  }
+  await tg(env, "answerCallbackQuery", { callback_query_id: cq.id, text: toast }).catch(() => {});
+  await tg(env, "editMessageReplyMarkup", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+  await tg(env, "sendMessage", { chat_id: cq.message.chat.id, text: note, parse_mode: "HTML", reply_parameters: { message_id: cq.message.message_id } }).catch(() => {});
   return json({ ok: true });
 }
