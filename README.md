@@ -27,11 +27,20 @@ Open http://localhost:8787, then the profile icon, then **Dev sign-in** (it's en
 
 > On Windows, if the project sits in a very deep folder, local D1 can fail with `SQLITE_CANTOPEN` because the path passes 260 characters. Either move the project somewhere shorter, or add `--persist-to C:/some/short/path` to the three local commands.
 
+## Tests
+
+```bash
+npm test           # the rules, on the Workers runtime (test/unit/)
+npm run test:e2e   # the real site in Chrome or Edge: every page and every kind of story (test/e2e/)
+```
+
+Neither needs a Cloudflare account or touches the live site. CI runs both before every deploy, and a failure stops the deploy.
+
 ## Deploy
 
 Live at https://talkhalifax.alexwmmolloy.workers.dev, on the Cloudflare account pinned in `wrangler.jsonc`.
 
-**Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the type check only. Changes only under `prototype/` or to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
+**Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, unit tests, browser check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the checks and tests only. Changes only under `prototype/` or to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
 It needs one repository secret, `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Account › Workers Scripts › Edit** and **Account › D1 › Edit**.
 
 **By hand:** `npm run db:migrate:remote`, then `npm run deploy`.

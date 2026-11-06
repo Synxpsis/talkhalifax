@@ -9,11 +9,16 @@
     "db:migrate:remote": "wrangler d1 migrations apply talkhalifax --remote",
     "db:seed:local": "node scripts/build-seed.mjs && wrangler d1 execute talkhalifax --local --file=scripts/seed.sql",
     "db:seed:remote": "node scripts/build-seed.mjs && wrangler d1 execute talkhalifax --remote --file=scripts/seed.sql",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node test/e2e/routes.mjs"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.0",
     "@cloudflare/workers-types": "5.20261104.1",
+    "puppeteer-core": "^25.16.0",
     "typescript": "5.9.3",
+    "vitest": "^5.1.0",
     "wrangler": "4.158.0"
   }
 }

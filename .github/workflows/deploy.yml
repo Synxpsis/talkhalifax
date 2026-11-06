@@ -36,6 +36,13 @@ jobs:
         run: npx tsc --noEmit
       - name: Client script parses
         run: node --check public/app.js
+      - name: Type check the tests
+        run: npx tsc -p test
+      - name: Unit tests
+        run: npm test
+      # The real site in a real browser (the runner's Chrome), against a local Worker with throwaway data
+      - name: Browser check
+        run: npm run test:e2e
 
   deploy:
     needs: check

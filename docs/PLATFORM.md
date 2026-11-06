@@ -38,7 +38,7 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
 | Schema | `migrations/0001`–`0010` | D1 tables (below) |
-| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails |
+| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, unit tests and a browser check (any failure stops the deploy), D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails |
 
 ## Content model
 

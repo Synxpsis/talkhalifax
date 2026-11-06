@@ -34,7 +34,7 @@ features land on a codebase that can take them.
 - Turnstile keys set by the editor, so sign-up has a bot check (**D3**).
 - ✅ Upgrade wrangler, workers-types and the compatibility date (**C3**).
 - Split `app.js` into modules and move the CSS to its own file, no bundler (**C4**).
-- First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI
+- ✅ First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI
   before deploy (**C1**, first slice).
 
 **6b. Installable and offline** (built Nov. 5)

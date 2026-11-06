@@ -1,0 +1,16 @@
+// The Worker as the tests run it: wrangler.jsonc without the things that need Cloudflare (Workers AI, the account, the
+// cron). Screening runs on its fixed rules only, unless a test passes its own AI. Keep bindings in step with wrangler.jsonc.
+{
+  "name": "talkhalifax-test",
+  "main": "../src/index.ts",
+  "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "../public", "binding": "ASSETS", "run_worker_first": true },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "talkhalifax-test", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "../migrations" }
+  ],
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }],
+  "vars": { "ADMIN_EMAILS": "", "ADMIN_USERNAMES": "admin" }
+}
