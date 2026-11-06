@@ -71,7 +71,7 @@ jobs:
           check() {
             curl -sf -m 20 "$B/" | grep -q TalkHalifax &&
             curl -sf -m 20 "$B/api/stories" | grep -q '"stories"' &&
-            curl -sf -m 20 "$B/api/weather" | grep -q '"weather"'
+            curl -sf -m 20 "$B/api/alerts" | grep -q '"alerts"'
           }
           for i in 1 2 3 4 5; do
             if check; then echo "Site is up"; exit 0; fi

@@ -23,7 +23,7 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 
 | Part | Where | What it does |
 |---|---|---|
-| Worker | `src/index.ts` | Routes, the 30-minute cron (weather, alerts, a check that library events are arriving, story stages, clean-up) |
+| Worker | `src/index.ts` | Routes, the 30-minute cron (weather warnings, a check that library events are arriving, story stages, clean-up) |
 | Auth | `src/auth.ts` | Password and Google sign-in, sessions (HttpOnly cookie), Turnstile, reset links, rate limits |
 | Stories | `src/stories.ts` | Saving stories and versions, Developing → Articles, comments, approvals |
 | Chat rooms | `src/room.ts` | One Durable Object per story: history, presence, typing, screening, bans, removals |
@@ -31,15 +31,14 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | Moderation | `src/moderation.ts` | Reports, bans, purges, account deletion |
 | Newsroom MCP | `src/mcp.ts` | The tools agents use (below) |
 | Telegram | `src/telegram.ts` | Drafts and held updates to the editor with buttons; plain notes |
-| Conditions feed | `src/alerts.ts` | Collects halifax.ca road notices, Windsor Street Exchange, Transit detours and weather warnings; only the weather warnings are shown today |
-| Weather and tides | `src/weather.ts` | Refreshed by the cron and served at `/api/weather`, but no longer shown on the site (TECH-DEBT **C9**). Environment Canada (api.weather.gc.ca) and DFO tides (api-iwls.dfo-mpo.gc.ca) |
+| Weather warnings | `src/alerts.ts` | Environment Canada warnings, watches and statements for the banners, Notices and `conditions` |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
 | Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, every 6 hours) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
 | Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in from the Alerts section of their profile, no account needed (kinds, quiet hours; `/#alerts` links land there). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
-| Schema | `migrations/0001`–`0010` | D1 tables (below) |
+| Schema | `migrations/0001`–`0011` | D1 tables (below) |
 | Tests | `test/unit/`, `test/e2e/routes.mjs` | `npm test`: the rules on the Workers runtime (screening, timing, approvals, bans, rate limits, events). `npm run test:e2e`: every page and story kind in a browser, with throwaway data |
 | Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, unit tests and a browser check (any failure stops the deploy), D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails |
 
@@ -72,8 +71,6 @@ P3 `decisions`, P4 `community`.
 | rcmp.ca (Halifax-area detachments) | Police notices, always reviewed | same |
 | Environment Canada | Weather warnings (notices and banners) | `conditions`, cron |
 | Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
-| DFO tides | Nothing shown today (**C9**) | cron |
-| halifax.ca road notices, Transit detours | Nothing shown today (**C9**) | cron |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
 | Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
 | Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | Fetched by the Events GitHub Action every 6 hours (about 16 requests) and posted to the Worker; the cron warns the editor when it's over 26 hours old |
@@ -115,7 +112,7 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 ## Data (D1 tables)
 
 `users`, `sessions`, `auth_throttle` (rate limits, cleared after a day), `stories`, `story_versions`, `room_stats`,
-`message_index` (a copy of every chat message), `comments`, `feeds` (cached weather, alerts and library events, plus the cron's failure counts), `leads`,
+`message_index` (a copy of every chat message), `comments`, `feeds` (cached weather warnings and library events, plus the cron's failure counts), `leads`,
 `pending_updates`, `reports`, `password_resets`, `push_subs` (one row per browser with alerts on: its push address,
 keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and `push_count` record a sent alert. Live chat history itself lives in each room's Durable Object storage.
 
@@ -145,7 +142,6 @@ See [OPERATING-MODEL.md](OPERATING-MODEL.md) for what each one does. Debt and ga
 
 - **r/halifax returns HTTP 429** to the Worker (Reddit rate-limits Cloudflare's addresses), so the Reddit signal is
   usually missing. The journalist reports it and carries on.
-- **Weather, tides and road notices are collected but not shown** (TECH-DEBT **C9**).
 - **Turnstile is off** until a widget's keys are set. Sign-up has rate limits but no bot check.
 - **The library's events feed refuses requests from Cloudflare** (HTTP 403), so GitHub Actions fetches it (TECH-DEBT
   **E1**). If that workflow stops, the Events tab keeps its last list and the cron warns after 26 hours.

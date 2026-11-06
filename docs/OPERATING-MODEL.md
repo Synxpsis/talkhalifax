@@ -29,7 +29,7 @@ None of them edit the repo.
 | **Journalist** (Tessa Aldridge) | `cloud-routine` | Every hour at :05 | Scan sources, file and work up to 5 leads, check in on up to 5 developing stories | Drafts and updates, through approvals |
 | **Desk editor** | `desk-editor` | 7:00 and 19:00 | Read `desk_status`; one briefing: what's waiting for you, open reports, overdue check-ins, stuck leads, the busiest rooms, what was published | One note per run |
 | **Standards editor** | `standards-editor` | 5:15 daily | Re-check every story published or changed in the last 24 hours against its source and the guidelines; propose fixes with `update_story` | Fixes through approvals; one note only if it found problems |
-| **Site reliability** | `site-reliability` | Every 6 hours at :35 | Check pages, APIs, newsroom tools and data freshness (weather, alerts, journalist activity) | One note only when something is wrong |
+| **Site reliability** | `site-reliability` | Every 6 hours at :35 | Check pages, APIs, newsroom tools and data freshness (weather warnings, events, journalist activity) | One note only when something is wrong |
 | **Source scout** | `source-scout` | Mondays 10:00 | Look for official Halifax-area sources worth adding, check they're reachable and copyable, and propose the best three | One note per run |
 
 Prompts for each live in [`newsroom/routines/`](../newsroom/routines/). The routine is the schedule; the prompt file
@@ -60,7 +60,7 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
  every 6h (:35)   Site reliability: health check                         → note only if broken
  19:00            Desk editor: evening briefing                          → note on Telegram
  Mondays 10:00    Source scout: proposals for new sources                → note on Telegram
- every 30 min     Worker cron: weather, tides, conditions, events check, Developing → Articles, clean-up
+ every 30 min     Worker cron: weather warnings, events check, Developing → Articles, clean-up
  every 6h (:20)   GitHub Action: fetch library events and post them to the site
 ```
 
@@ -72,7 +72,7 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
 | ✏️ Change to a published story | Journalist, standards editor (`update_story`) | Approve / Discard |
 | 📣 Send this notice as a push alert? (only when some readers have that kind of alert on) | The Worker, when a notice goes live | Send alert / No alert |
 | 🔢 Updated without approval (new numbers on a live weather or outage notice) | Journalist, standards editor (`update_story`) | No |
-| 🛠 Site cron failed twice in a row (weather, alerts, stages, clean-up), then recovered | The Worker | No |
+| 🛠 Site cron failed twice in a row (weather warnings, events, stages, clean-up), then recovered | The Worker | No |
 | 🚩 First report on a message or comment | Readers | No (review on the site) |
 | 👋 Journalist profile created | Journalist | No |
 | 🤖 Briefing, audit, health or scouting note | Desk, standards, reliability, scout (`notify_editor`) | No |

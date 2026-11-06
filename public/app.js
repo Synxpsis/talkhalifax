@@ -24,7 +24,7 @@
 
   // ---------- State ----------
   const S = {
-    me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, offline: false,
+    me: null, providers: {}, stories: null, full: {}, alerts: null, offline: false,
     sort: "active", current: "home", article: null, user: null, userFrom: null, users: {},
   };
   const reported = new Set(); // messages and comments this person has reported

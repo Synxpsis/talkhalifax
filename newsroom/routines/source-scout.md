@@ -13,7 +13,7 @@ A good source:
 - Covers something people here care about that the site doesn't cover yet.
 
 Already covered (read `docs/PLATFORM.md`, "Sources"): halifax.ca news releases, news.novascotia.ca, Halifax-area RCMP,
-Environment Canada warnings, Nova Scotia Power outages, DFO tides, halifax.ca road notices and Transit detours.
+Environment Canada warnings, Nova Scotia Power outages, Halifax Transit's live feeds and Halifax Public Libraries' events.
 Already wanted: Halifax Public Libraries events, Halifax Water, Halifax Transit service alerts, Nova Scotia Health.
 
 Each run:

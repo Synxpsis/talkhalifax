@@ -28,7 +28,6 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 | C4 | **One big client file.** `public/app.js` (about 1,270 lines) holds every view, and `public/index.html` (about 730 lines) holds all the CSS. No build step. | Phase 6 (service worker, push, offline) adds more. Merges and reviews get harder | Split into ES modules served as static files (`views/`, `chat.js`, `api.js`) and move the CSS to `styles.css`. Still no bundler | Medium | M |
 | C5 | **`src/mcp.ts` keeps growing** (about 600 lines, 22 tools in one switch). | Every new source or agent adds to it | Split into `mcp/stories.ts`, `mcp/leads.ts`, `mcp/desk.ts` with a shared tool table | Low | M |
 | C7 | **Push alerts are sent from one request.** A Worker request can make only 50 outgoing requests on the Free plan (1,000 on Paid), and each alert is one. | Past about 40 subscribers on Free, some won't get an alert | Send through a Cloudflare Queue in batches, or move to the Paid plan. Check which plan the account is on | Medium | M |
-| C9 | **Weather, tides and road notices are collected but not shown.** The cron still refreshes `/api/weather` and the road and Transit items in `/api/alerts`, the smoke test and site reliability still check them, but no page uses them since Home was redesigned. Only weather warnings appear. | Work and checks for data nobody sees, and a useful feature quietly gone | Editor's decision: bring back a small card on Home, or stop collecting them | Low | S |
 | C8 | **The service worker's caches are versioned by hand** (`VERSION` in `public/sw.js`). Everything is network-first, so deploys show up anyway, but a change to what's cached needs the version bumped. | Old cached files can linger offline | Bump `VERSION` when the cached file list changes; later, stamp it at deploy | Low | S |
 
 ## Data, privacy and operations
@@ -48,6 +47,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 
 ## Paid off
 
+- **Nov. 5, 2026:** the weather and tides feed and the unused road and Transit detour collection are removed (editor's decision). Weather warnings stay, and a failed refresh now reaches the cron's warning.
 - **Nov. 5, 2026:** first automated tests, run by CI before every deploy (**C1**, first slice; the rest stays open above).
 - **Nov. 5, 2026:** GitHub Actions upgraded to `checkout` and `setup-node` v7, which end the Node 20 warnings.
 - **Nov. 5, 2026:** library events reach the site through a GitHub Action, because the feed refuses Cloudflare (**E1**, editor's decision).
