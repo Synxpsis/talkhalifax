@@ -1205,6 +1205,20 @@
     navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.t === "go") location.href = e.data.url; });
   }
 
+  // ---------- Footer ----------
+  document.getElementById("sfYear").textContent = new Date().getFullYear();
+  // "Install the app" shows only where the browser offers its own install prompt (Chrome, Edge, Android)
+  let installPrompt = null;
+  const sfInstall = document.getElementById("sfInstall");
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; sfInstall.hidden = false; });
+  window.addEventListener("appinstalled", () => { installPrompt = null; sfInstall.hidden = true; });
+  document.getElementById("sfInstallBtn").addEventListener("click", async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => {});
+    installPrompt = null; sfInstall.hidden = true;
+  });
+
   show(location.hash.slice(1) || "home");
   Promise.all([loadMe(), loadStories(), loadAlerts()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible

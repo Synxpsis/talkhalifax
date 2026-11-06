@@ -316,10 +316,34 @@ body.chat-open #article.wide { padding-right: calc(var(--chatw) + max(28px, env(
 .offline-bar { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--hdr, 64px)); z-index: 8; padding: 8px 16px; font-size: 13.5px; text-align: center; color: var(--ink); background: var(--banner-caution); border-bottom: 1px solid var(--line); }
 .offline-bar[hidden] { display: none; }
 
-footer { border-top: 1px solid var(--line); }
-footer .wrap { padding-block: 22px 32px; font-size: 13px; color: var(--muted); }
-footer p { margin: 0 0 6px; max-width: 62ch; }
-footer a { margin-right: 14px; }
+/* Global footer: the brand, every section, the official sources behind the facts, then the fine print */
+.site-foot { border-top: 1px solid var(--line); background: var(--surface-sunken); color: var(--ink-muted); font-size: 14px; }
+.site-foot .wrap { padding-block: 40px calc(28px + env(safe-area-inset-bottom, 0px)); }
+.sf-top { display: grid; grid-template-columns: minmax(220px, 1.3fr) repeat(3, minmax(0, 1fr)); gap: 32px 40px; }
+.sf-brand { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.sf-brand .name { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); }
+.sf-brand .name > span { color: var(--ink); }
+.sf-brand .name > span > span { color: var(--accent); }
+.sf-brand .name img { width: 32px; height: 32px; border-radius: 8px; }
+.sf-brand p { margin: 0; max-width: 34ch; line-height: 1.5; }
+.sf-col h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.sf-col ul { list-style: none; margin: 0; padding: 0; }
+.sf-col li > a, .sf-col li > button { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; min-height: 36px; color: var(--ink); font-size: 14.5px; }
+.sf-col li > a:hover, .sf-col li > button:hover { text-decoration: underline; text-decoration-color: var(--ink-faint); text-underline-offset: 3px; }
+.sf-col li > a:focus-visible, .sf-col li > button:focus-visible, .sf-brand .name:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.sf-col li[hidden] { display: none; }
+.sf-col .ext::after { content: "↗"; margin-left: 4px; font-size: 12px; color: var(--ink-faint); }
+.sf-fine { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; }
+.sf-fine p { margin: 0; max-width: 72ch; }
+.sf-fine a { color: var(--ink); }
+/* Keep clear of the docked chat: beside it on desktop, above its bar on phones */
+body.chat-open .site-foot .wrap { padding-right: calc(var(--chatw) + max(28px, env(safe-area-inset-right, 0px))); }
+@media (max-width: 960px) {
+  body.chat-open .site-foot .wrap { padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  body.wide-view .site-foot .wrap { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 860px) { .sf-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sf-brand { grid-column: 1 / -1; } }
+@media (max-width: 560px) { .site-foot .wrap { padding-top: 32px; } .sf-top { gap: 28px 20px; } .sf-sources { grid-column: 1 / -1; } .sf-fine { margin-top: 28px; } }
 
 @media (max-width: 560px) {
   header .wrap { padding-block: 10px; }
@@ -637,9 +661,48 @@ img { max-width: 100%; }
 
 <dialog class="drawer" id="navDrawer" aria-label="Menu" tabindex="-1"></dialog>
 
-<footer>
+<footer class="site-foot">
   <div class="wrap">
-    <p>TalkHalifax is a prototype. Articles are written by AI from Halifax Regional Municipality releases and may contain mistakes; each one links to its original for attribution. Weather from Environment and Climate Change Canada, tides from Fisheries and Oceans Canada. <a href="#privacy">Privacy</a></p>
+    <div class="sf-top">
+      <div class="sf-brand">
+        <button class="name" type="button" data-go="home" aria-label="TalkHalifax, home"><img src="/icons/icon-192.png" alt="" width="32" height="32"><span>Talk<span>Halifax</span></span></button>
+        <p>Halifax news from official sources, rewritten short, with a live chat in every story.</p>
+      </div>
+      <nav class="sf-col" aria-label="Footer sections">
+        <h2>Read</h2>
+        <ul>
+          <li><button type="button" data-go="home">Developing Stories</button></li>
+          <li><button type="button" data-go="articles">Articles</button></li>
+          <li><button type="button" data-go="notices">Notices</button></li>
+          <li><button type="button" data-go="events">Events</button></li>
+          <li><button type="button" data-go="transit">Transit</button></li>
+        </ul>
+      </nav>
+      <div class="sf-col">
+        <h2>Stay in the loop</h2>
+        <ul>
+          <li><button type="button" data-go="alerts">Get alerts</button></li>
+          <li id="sfInstall" hidden><button type="button" id="sfInstallBtn">Install the app</button></li>
+          <li><button type="button" data-go="profile">Your profile</button></li>
+          <li><button type="button" data-go="privacy">Privacy</button></li>
+        </ul>
+      </div>
+      <div class="sf-col sf-sources">
+        <h2>Our sources</h2>
+        <ul>
+          <li><a class="ext" href="https://www.halifax.ca/home/news" target="_blank" rel="noopener">Halifax Regional Municipality</a></li>
+          <li><a class="ext" href="https://news.novascotia.ca/" target="_blank" rel="noopener">Province of Nova Scotia</a></li>
+          <li><a class="ext" href="https://rcmp.ca/en/nova-scotia/news" target="_blank" rel="noopener">Nova Scotia RCMP</a></li>
+          <li><a class="ext" href="https://weather.gc.ca/" target="_blank" rel="noopener">Environment Canada</a></li>
+          <li><a class="ext" href="https://www.halifax.ca/transportation/halifax-transit" target="_blank" rel="noopener">Halifax Transit</a></li>
+          <li><a class="ext" href="https://www.halifaxpubliclibraries.ca/" target="_blank" rel="noopener">Halifax Public Libraries</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="sf-fine">
+      <p>TalkHalifax is a prototype. Stories are written by AI from official releases and may contain mistakes; each one links to its original. Tides from Fisheries and Oceans Canada, outages from Nova Scotia Power.</p>
+      <p>© <span id="sfYear">2026</span> TalkHalifax</p>
+    </div>
   </div>
 </footer>
 
