@@ -26,13 +26,17 @@ async function hookSecret(env: Env) {
   return [...new Uint8Array(h)].slice(0, 24).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** A line of a story's text: a string starting "## " is a subheading. */
+const bodyLine = (p: string) => p.startsWith("## ") ? `<b>${html(p.slice(3))}</b>` : html(p);
+const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return "the source"; } };
+
 /** Send a draft to the editor. Returns "sent", or why it wasn't. */
 export async function sendDraft(env: Env, id: string): Promise<string> {
   if (!approvalOn(env)) return "Telegram isn't set up";
-  const s = await env.DB.prepare("SELECT rowid AS n, kind, headline, dek, area, section, facts, body, means, source_url FROM stories WHERE id = ?")
+  const s = await env.DB.prepare("SELECT rowid AS n, kind, headline, dek, area, section, facts, body, means, actions, source_url FROM stories WHERE id = ?")
     .bind(id).first<Record<string, any>>();
   if (!s) return "no such story";
-  const facts: { k: string; v: string }[] = JSON.parse(s.facts || "[]"), body: string[] = JSON.parse(s.body || "[]"), means: string[] = JSON.parse(s.means || "[]");
+  const facts: { k: string; v: string }[] = JSON.parse(s.facts || "[]"), body: string[] = JSON.parse(s.body || "[]"), means: string[] = JSON.parse(s.means || "[]"), actions: string[] = JSON.parse(s.actions || "[]");
   const head = [
     `📝 <b>New ${s.kind === "notice" ? "notice" : "article"} waiting for your approval</b>`,
     "",
@@ -43,14 +47,15 @@ export async function sendDraft(env: Env, id: string): Promise<string> {
     ...facts.map(f => `• <b>${html(f.k)}:</b> ${html(f.v)}`),
   ];
   const tail = [
+    ...(actions.length ? ["", "<b>What to do</b>", ...actions.map(m => "• " + html(m))] : []),
     ...(means.length ? ["", `<b>${s.kind === "notice" ? "What to do" : "What this means"}</b>`, ...means.map(m => "• " + html(m))] : []),
     "",
-    `Source: <a href="${html(s.source_url)}">halifax.ca release</a>`,
+    `Source: <a href="${html(s.source_url)}">${html(hostOf(s.source_url))}</a>`,
   ];
   // Telegram caps a message at 4096 characters; the body gives way first
   let text = "";
   for (let keep = body.length; keep >= 0; keep--) {
-    text = [...head, "", ...body.slice(0, keep).map(html), keep < body.length ? "…" : "", ...tail].filter((l, i, a) => l || a[i - 1]).join("\n");
+    text = [...head, "", ...body.slice(0, keep).map(bodyLine), keep < body.length ? "…" : "", ...tail].filter((l, i, a) => l || a[i - 1]).join("\n");
     if (text.length <= 4000) break;
   }
   try {
@@ -117,11 +122,12 @@ export async function sendUpdate(env: Env, n: number): Promise<string> {
   ];
   for (const [k, label] of Object.entries(LABELS)) if (c[k] !== undefined) lines.push(`<b>${label}:</b> ${html(c[k])}`);
   if (Array.isArray(c.facts)) lines.push("", "<b>Facts</b>", ...c.facts.map((f: any) => `• <b>${html(f.k)}:</b> ${html(f.v)}`));
+  if (Array.isArray(c.actions)) lines.push("", "<b>What to do</b>", ...c.actions.map((m: string) => "• " + html(m)));
   if (Array.isArray(c.means)) lines.push("", `<b>${p.kind === "notice" ? "What to do" : "What this means"}</b>`, ...c.means.map((m: string) => "• " + html(m)));
   const body: string[] = Array.isArray(c.body) ? c.body : [];
   let text = "";
   for (let keep = body.length; keep >= 0; keep--) {
-    text = [...lines, ...(body.length ? ["", "<b>Text</b>", ...body.slice(0, keep).map(html), keep < body.length ? "…" : ""] : []), "", `<a href="${SITE}/#article-${encodeURIComponent(p.story_id)}">Current version</a>`]
+    text = [...lines, ...(body.length ? ["", "<b>Text</b>", ...body.slice(0, keep).map(bodyLine), keep < body.length ? "…" : ""] : []), "", `<a href="${SITE}/#article-${encodeURIComponent(p.story_id)}">Current version</a>`]
       .filter((l, i, a) => l || a[i - 1]).join("\n");
     if (text.length <= 4000) break;
   }

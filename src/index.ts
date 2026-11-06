@@ -13,7 +13,7 @@ export { ArticleRoom } from "./room";
 
 interface StoryRow {
   id: string; kind: string; status: string; section: string; area: string; headline: string; dek: string;
-  facts: string; body: string; means: string; status_label: string; superseded_by: string | null;
+  facts: string; body: string; means: string; actions: string; status_label: string; superseded_by: string | null;
   read_min: number; reason: string; source_url: string; published_at: string; version: number; updated_at: string;
   message_count: number | null; here_now: number | null; last_message_at: number | null;
   last_author_id: string | null; last_author_name: string | null;
@@ -32,7 +32,7 @@ const storyOut = (r: StoryRow, full = false) => ({
   comments: { count: r.comment_count ?? 0, lastAt: r.last_comment_at },
   room: { messages: r.message_count ?? 0, here: r.here_now ?? 0, lastAt: r.last_message_at, lastAuthor: r.last_author_name || null },
   author: r.author_id && r.author_name ? { id: r.author_id, name: r.author_name, bio: r.author_bio || "" } : null,
-  ...(full ? { facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means) } : {}),
+  ...(full ? { facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means), actions: JSON.parse(r.actions) } : {}),
 });
 
 const STORY_SELECT = `

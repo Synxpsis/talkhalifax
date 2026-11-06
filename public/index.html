@@ -228,22 +228,29 @@ header .abar-row { display: flex; flex-wrap: nowrap; align-items: center; justif
 .back:hover { text-decoration: underline; text-underline-offset: 3px; }
 .kicker { margin: 22px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 article h1 { font-family: var(--f-display); font-weight: 700; font-size: 38px; line-height: 1.08; letter-spacing: -.03em; margin: 0 0 12px; text-wrap: balance; }
-.dek { font-family: var(--f-read); font-size: 19px; line-height: 1.45; color: var(--ink-muted); margin: 0 0 16px; max-width: 34em; }
-.byline { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-.byline .ai { color: var(--adv); }
-.byline .by { font-family: var(--f-body); font-size: 13.5px; color: var(--ink); flex-basis: 100%; }
-.byline .by b { font-weight: 600; }
-.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0 20px; margin: 22px 0; padding: 4px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
-.facts dt, .facts dd { padding: 9px 0; border-bottom: 1px solid var(--line); margin: 0; }
-.facts dt { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 11px; }
-.facts dd { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
-.facts dt:last-of-type, .facts dd:last-of-type { border-bottom: 0; }
+.dek { font-family: var(--f-read); font-size: 19px; line-height: 1.45; color: var(--ink-muted); margin: 0 0 12px; max-width: 34em; }
+.byline { font-size: 13.5px; line-height: 1.5; color: var(--muted); margin: 0 0 20px; }
+.byline > span { display: block; }
+.byline a { color: inherit; }
+.todo { background: var(--surface-solid); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 16px 20px; margin: 0 0 26px; max-width: 40em; }
+.todo h2, .key-details h2 { font-size: 15px; font-weight: 700; line-height: 1.4; margin: 0 0 8px; }
+.todo ul { margin: 0; padding-left: 18px; }
+.todo li { font-family: var(--f-read); font-size: 16px; line-height: 1.45; margin-bottom: 6px; }
+.todo li:last-child { margin-bottom: 0; }
+.todo a, .facts a, .body a { color: inherit; }
+.facts { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 8px 20px; margin: 0 0 24px; max-width: 40em; }
+.facts dt, .facts dd { margin: 0; line-height: 1.45; }
+.facts dt { font-size: 13.5px; color: var(--muted); }
+.facts dd { font-size: 15px; overflow-wrap: anywhere; }
+.key-details { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line); }
+.key-details .facts { margin-bottom: 0; }
 .body p { font-family: var(--f-read); font-size: 17.5px; line-height: 1.65; margin: 0 0 1em; max-width: 36em; }
-.body h2 { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 28px 0 10px; }
+.body h2 { font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; margin: 30px 0 8px; }
+.body h2.means-h { font-family: var(--f-body); font-size: 12px; font-weight: 600; letter-spacing: .1em; line-height: inherit; text-transform: uppercase; color: var(--muted); margin: 28px 0 10px; }
 .body ul { margin: 0 0 1em; padding-left: 1.1em; max-width: 36em; }
 .body li { font-family: var(--f-read); font-size: 17.5px; line-height: 1.55; margin-bottom: .4em; }
 .source { margin-top: 26px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
-.byline .by-link { all: unset; cursor: pointer; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.byline .by-link { all: unset; cursor: pointer; font-weight: 600; color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .byline .by-link:hover { text-decoration-color: currentColor; }
 .byline .by-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 .author-card { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; gap: 14px; align-items: flex-start; padding: 18px 0; border-bottom: 1px solid var(--line); }
@@ -377,11 +384,15 @@ body.chat-open .site-foot .wrap { padding-right: calc(var(--chatw) + max(28px, e
   .profile-card { padding: 18px; gap: 14px; }
   .profile-card .pic { width: 64px; height: 64px; }
   .profile-card h1 { font-size: 28px; }
-  article h1 { font-size: 36px; }
-  .dek { font-size: 19px; }
-  .body p { font-size: 17.5px; }
-  .facts { grid-template-columns: minmax(0, 1fr); }
-  .facts dt { border-bottom: 0; padding-bottom: 0; }
+  article h1 { font-size: 30px; line-height: 1.1; letter-spacing: -.025em; margin-bottom: 10px; }
+  .dek { font-size: 17px; line-height: 1.42; }
+  .byline { font-size: 13px; margin-bottom: 18px; }
+  .todo { padding: 14px 16px; margin-bottom: 22px; }
+  .body p { font-size: 17.5px; line-height: 1.6; }
+  .body h2 { font-size: 20px; margin-top: 26px; }
+  .facts { grid-template-columns: 104px minmax(0, 1fr); gap: 10px 12px; margin-bottom: 18px; }
+  .facts dt { font-size: 13px; }
+  .facts dd { font-size: 14.5px; }
 }
 /* Below 960px the chat becomes a sheet docked to the bottom edge; its header bar toggles it */
 @media (max-width: 960px) {
@@ -628,7 +639,7 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
     </div>
     <p class="forum-lede">Settled stories. The live chat has closed; comments and replies stay.</p>
     <div class="cards" id="artCards"><div class="msg">Loading…</div></div>
-    <p class="forum-foot">Written by AI from official halifax.ca releases, each with a link to the original. City notices about fires, emergencies and water advisories stick to the facts and have chat and comments turned off.</p>
+    <p class="forum-foot">Written by AI from official releases, each with a link to the original. Notices about fires, emergencies and water advisories stick to the facts and have chat and comments turned off.</p>
   </section>
 
   <section class="view wrap" id="notices" hidden>
@@ -640,7 +651,7 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
     <div class="ncards" id="nActive"><div class="msg">Loading…</div></div>
     <h2 class="n-sub" id="nEarlierH" hidden>Earlier</h2>
     <div class="ncards" id="nEarlier"></div>
-    <p class="forum-foot">City notices are restated from official releases, facts only, with chat turned off. Weather alerts come from Environment and Climate Change Canada.</p>
+    <p class="forum-foot">Notices are restated from official releases, facts only, with chat turned off. Weather alerts come from Environment and Climate Change Canada.</p>
   </section>
 
   <section class="view wrap" id="article" hidden></section>

@@ -145,11 +145,12 @@ Decide one `kind` per release:
 All kinds:
 - `kind`, `headline`, `source` (the release URL), `publishedAt` (the release's PUBLISHED time, ISO UTC),
   `writtenAt` (now, ISO UTC), `section` (from the release, e.g. "City Hall").
-- `notice` also has: `area` if obvious, `status` (e.g. "Ongoing", "Update", "Final update", "Lifted"),
+- `notice` also has: `area` if obvious, `statusLabel` (e.g. "Ongoing", "Update", "Final update", "Lifted"),
   `headline` (plain statement of the situation, under about 100 characters), `dek` (one factual sentence),
   `facts` (copied exactly, as for articles), `body` (1 to 3 short paragraphs restating only what the release says),
-  optional `means` (1 to 2 points, ONLY the actions the city itself asked people to take, e.g. "avoid the area",
-  "boil water for one minute"), and `readMin` 1.
+  and optional `actions` (1 to 3 points, ONLY the actions the source itself asks people to take, e.g. "avoid the area",
+  "boil water for one minute"). A notice shows `actions` first, then `facts`, then `body`, so `body` only adds what
+  those two don't say, and one paragraph is often enough.
   If an existing notice on the site is about the same incident and is older, publish the NEW notice normally, then
   mark the OLD one with `update_story` (changes `{"supersededBy": "<new id>"}`, note "Replaced by a newer update").
 - `skip`: `headline` is the release title; add `reason` (short, lower-case friendly, e.g. "Event already over").
@@ -160,9 +161,20 @@ All kinds:
 - `dek`: one sentence that adds context, not a repeat of the headline.
 - `facts`: 2 to 5 `{ "k": label, "v": value }` pairs: dates, times, places, deadlines, amounts, links (as `halifax.ca/...` without https).
   COPY THESE EXACTLY from the release. Never infer, round or reformat a date, time, address or dollar amount.
-- `body`: 2 or 3 short paragraphs (strings), 150 to 250 words in total.
-- `means`: 1 or 2 short "what this means for you" points (strings).
-- `readMin`: 1 or 2.
+- `actions`: 1 to 3 short points saying what a reader can do, by when: a deadline, a date to change plans for, a place to
+  apply. They appear in a "What to do" box at the top. Each must come from the release and be something a reader can act
+  on. If there's nothing to do, leave `actions` out. Never fill it with "more information is on the website" or a repeat
+  of the story. Links worth having go in `facts`.
+- `body`: short paragraphs (strings), as long as the release needs and no longer, up to about 250 words. A short release
+  gets a short story, and you never pad one. Don't repeat the headline, `actions` or `facts` when the sentence adds
+  nothing to them: say what they can't, such as why it's happening and who it affects.
+  When a story covers several separate things (service changes across departments, say), start each part with a
+  subheading: a string starting `## `, like `"## Buses and ferries"`, in plain words. Don't use them in a story of under
+  about 150 words.
+- `facts` are the quick reference shown as "Key details" below the story. The site already shows the publish date, so
+  never add it as a fact, for articles or notices.
+
+Never set `means` or `readMin` on a new story. The site works out read time, and `means` exists only on older articles.
 
 ## Updating a story instead of writing a new one
 
@@ -190,7 +202,7 @@ every hour: weather, outages, and Halifax Water's boil-water, water-quality and 
 - `read_release` on the story's `source` again, and `get_story` for what the story says now.
 - Update the story (`update_story`, with a `note`) only when one of these is true:
   - Timing has gone stale against today's date. An event that has happened, a deadline that has passed, or a "Tuesday"
-    that is no longer ahead. Rewrite only the affected wording, `means` points and the headline if it invites people to
+    that is no longer ahead. Rewrite only the affected wording, `actions` or `means` points and the headline if it invites people to
     something that is over ("The open house was held Tuesday, Nov. 3"). Keep every fact value as the release states it.
   - The city changed the release page: a new date, place, link or detail. Change those facts to match it exactly.
 - Otherwise change nothing. A check-in that finds the story still right is a good check-in.
@@ -229,12 +241,12 @@ mark. Outcome "updated" or "unchanged", and notes saying what changed on the pag
 
 ```json
 {
- "kind": "article", "area": "South End", "section": "City Hall", "publishedAt": "2026-10-27T17:27:24Z", "readMin": 2,
+ "kind": "article", "area": "South End", "section": "City Hall", "publishedAt": "2026-10-27T17:27:24Z",
  "headline": "St. Mary's Boat Club could be rebuilt to stop the flooding. The city wants your input Tuesday",
  "dek": "A Nov. 3 open house is the first public look at plans for the flood-prone waterfront facility.",
  "facts": [{"k": "Open house", "v": "Tuesday, Nov. 3, 6 to 8 p.m."}, {"k": "Where", "v": "St. Mary's Boat Club, 1641 Fairfield Road, Halifax"}, {"k": "Stage", "v": "Pre-design"}, {"k": "Updates", "v": "halifax.ca/smbc"}],
  "body": ["The Halifax Regional Municipality is planning to redevelop the St. Mary's Boat Club, and it wants to hear from residents before any designs are drawn.", "The building regularly floods, which the city links to rising sea levels, extreme tides and major storms. The redevelopment is meant to make the historic waterfront facility more resilient to climate change, easier to get into and around, and sustainable over the long term.", "The project is still in pre-design, so there is no plan to react to yet. What residents say at the open house will help shape what gets designed."],
- "means": ["If you use the boat club or live nearby, Tuesday evening is the earliest chance to influence the design.", "Can't make it? The city will post project updates at halifax.ca/smbc."],
+ "actions": ["Go to the open house on Tuesday, Nov. 3, 6 to 8 p.m., to have a say before designs are drawn.", "Can't make it? The city will post project updates at halifax.ca/smbc."],
  "source": "https://www.halifax.ca/home/news/municipality-seeks-public-input-future-st-marys-boat-club",
  "writtenAt": "2026-11-01T23:30:00Z"
 }

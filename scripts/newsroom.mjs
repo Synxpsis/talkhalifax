@@ -34,7 +34,7 @@ function token() {
 
 // Guideline field names → API field names (the rest are the same)
 const RENAME = { status: "statusLabel" };
-const ALLOWED = new Set(["kind", "section", "area", "headline", "dek", "facts", "body", "means", "statusLabel", "supersededBy", "readMin", "reason", "source", "publishedAt", "note", "reopen"]);
+const ALLOWED = new Set(["kind", "section", "area", "headline", "dek", "facts", "body", "means", "actions", "statusLabel", "supersededBy", "readMin", "reason", "source", "publishedAt", "note", "reopen"]);
 
 async function list() {
   const r = await fetch(`${BASE}/api/stories`);

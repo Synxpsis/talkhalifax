@@ -65,10 +65,10 @@ export async function evaluateStages(env: Env) {
 
 // ---------- Newsroom: how Claude publishes and updates stories ----------
 // Authenticated with the NEWSROOM_TOKEN secret (Authorization: Bearer …).
-const FIELDS = ["kind", "section", "area", "headline", "dek", "facts", "body", "means", "status_label", "superseded_by", "read_min", "reason", "source_url", "published_at"] as const;
-const JSON_FIELDS = new Set(["facts", "body", "means"]);
+const FIELDS = ["kind", "section", "area", "headline", "dek", "facts", "body", "means", "actions", "status_label", "superseded_by", "read_min", "reason", "source_url", "published_at"] as const;
+const JSON_FIELDS = new Set(["facts", "body", "means", "actions"]);
 const API_NAMES: Record<string, typeof FIELDS[number]> = {
-  kind: "kind", section: "section", area: "area", headline: "headline", dek: "dek", facts: "facts", body: "body", means: "means",
+  kind: "kind", section: "section", area: "area", headline: "headline", dek: "dek", facts: "facts", body: "body", means: "means", actions: "actions",
   statusLabel: "status_label", supersededBy: "superseded_by", readMin: "read_min", reason: "reason", source: "source_url", publishedAt: "published_at",
 };
 
@@ -79,7 +79,7 @@ export class NewsroomError extends Error {}
 // only moves numbers, times and dates (new counts, a new "updated at") goes live at once and the editor is told after.
 // Anything else, a new status or new wording, still waits for a tap.
 export const LIVE_NOTICE = /^(ns-power-outages-|weather-)/;
-const NUMBER_ONLY_FIELDS = new Set(["headline", "dek", "facts", "body", "means", "published_at"]);
+const NUMBER_ONLY_FIELDS = new Set(["headline", "dek", "facts", "body", "means", "actions", "published_at"]);
 const TIME_WORDS = /\b[ap]\.m\.|\b(am|pm|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tonight|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?)\b\.?/gi;
 /** The text with its numbers, times and dates blanked out, so two versions that differ only in those compare equal. */
 const shape = (v: unknown) => String(v ?? "").toLowerCase().replace(TIME_WORDS, "#").replace(/\d[\d,.:+-]*/g, "#").replace(/#(\W*#)+/g, "#").replace(/\s+/g, " ").trim();
@@ -195,11 +195,11 @@ async function snapshot(env: Env, id: string, version: number, note: string, aut
 // ---------- Review: moderators approve or discard drafts ----------
 export async function listDrafts(env: Env) {
   const rows = await env.DB.prepare(
-    `SELECT s.id, s.kind, s.headline, s.dek, s.area, s.facts, s.body, s.means, s.source_url AS source, s.updated_at AS updatedAt,
+    `SELECT s.id, s.kind, s.headline, s.dek, s.area, s.facts, s.body, s.means, s.actions, s.source_url AS source, s.updated_at AS updatedAt,
             (SELECT author FROM story_versions v WHERE v.story_id = s.id ORDER BY version DESC LIMIT 1) AS author
        FROM stories s WHERE s.stage = 'draft' ORDER BY s.updated_at DESC`,
   ).all<Record<string, string>>();
-  return rows.results.map(r => ({ ...r, facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means) }));
+  return rows.results.map(r => ({ ...r, facts: JSON.parse(r.facts), body: JSON.parse(r.body), means: JSON.parse(r.means), actions: JSON.parse(r.actions) }));
 }
 
 export async function reviewDraft(env: Env, id: string, action: "approve" | "discard") {

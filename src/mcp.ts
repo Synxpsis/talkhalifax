@@ -70,8 +70,9 @@ const STORY_FIELDS = {
   area: str("Neighbourhood, community or topic, 1–3 words"),
   section: str("Section from the source, e.g. City Hall"),
   facts: { type: "array", items: S({ k: str("Label"), v: str("Value copied exactly from the source") }, ["k", "v"]), description: "2–5 key facts" },
-  body: { type: "array", items: { type: "string" }, description: "2–3 short paragraphs" },
-  means: { type: "array", items: { type: "string" }, description: "1–2 'what this means for you' points (notices: only actions the city asked for)" },
+  body: { type: "array", items: { type: "string" }, description: "Short paragraphs. A string starting \"## \" is a subheading" },
+  actions: { type: "array", items: { type: "string" }, description: "What to do: 1–3 real actions or deadlines for the reader, shown at the top. Leave it out if there are none" },
+  means: { type: "array", items: { type: "string" }, description: "Older articles only. New stories use actions" },
   statusLabel: str("Notices: Ongoing, Update, Final update, Lifted…"),
   supersededBy: str("Notices: id of the newer notice that replaces this one"),
   readMin: { type: "integer", minimum: 1, maximum: 5 },
@@ -349,7 +350,7 @@ async function listStories(env: Env, stage = "", limit = 100) {
 async function getStory(env: Env, id: string) {
   const s = await env.DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first<Record<string, unknown>>();
   if (!s) throw new NewsroomError(`No story with id ${id}.`);
-  for (const k of ["facts", "body", "means"]) s[k] = JSON.parse(String(s[k]));
+  for (const k of ["facts", "body", "means", "actions"]) s[k] = JSON.parse(String(s[k]));
   const versions = await env.DB.prepare("SELECT version, note, author, created_at AS at FROM story_versions WHERE story_id = ? ORDER BY version DESC LIMIT 10").bind(id).all();
   return { story: s, versions: versions.results };
 }

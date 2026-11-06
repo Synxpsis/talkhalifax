@@ -49,7 +49,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 ## Content model
 
 A **story** has a `kind`:
-- `article`: a civic story people can act on or discuss. Facts, body, "what this means", live chat, then comments.
+- `article`: a civic story people can act on or discuss. "What to do" (`actions`, when there is something), body with optional subheadings, key details, live chat, then comments. Older articles keep their `means` points at the bottom.
 - `notice`: urgent or safety facts only, no interpretation, no comments. Can be `supersededBy` a newer notice.
 - `skip`: a release we decided not to cover (with a reason), so it isn't picked up again.
 

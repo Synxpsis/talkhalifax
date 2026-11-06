@@ -90,7 +90,10 @@ text sizes must already be readable: 16px body minimum on inputs to stop iOS zoo
 | Story card | `.card` (`.lead` spans 2) | Glass; kicker, headline, dek, pills, live viewer count |
 | Pill | `.pill` | Status labels (LIVE, Update, area) |
 | Alert banner | `.abar` | Solid band on Home for city notices and weather warnings |
-| Facts | `.facts` | Two-column label/value grid, copied facts only |
+| Byline | `.byline` | Author, date, read time, then the AI disclosure linking to the source. An "Updated" time only if the story has really changed |
+| What to do | `.todo` | Solid card under the byline with the reader's actions. Left out when there are none |
+| Facts | `.facts` | Compact label/value list, copied facts only: under "What to do" on a notice, as "Key details" (`.key-details`) below the story on an article |
+| Story subheading | `.body h2` | From a body string starting `## ` |
 | Byline | `.byline`, `.author-card` | Mono; links to the author's profile |
 | Chat | `.chat`, `.msgs`, `.grp`, `.bubble`, `.composer`, `.send` | Docked on desktop, sheet on mobile |
 | Comments | `.comments-sec`, `.cm`, `.creplies` | Archived articles, threaded one level |

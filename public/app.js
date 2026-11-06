@@ -4,7 +4,9 @@
   const TZ = "America/Halifax";
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const linkify = s => esc(s).replace(/\b((?:engage)?halifax\.ca\/[A-Za-z0-9/_-]+)/g, '<a href="https://$1" target="_blank" rel="noopener">$1</a>');
+  const linkify = s => esc(s)
+    .replace(/\b((?:engagehalifax|halifax|halifaxwater|novascotia)\.ca\/[A-Za-z0-9/_-]+)/g, '<a href="https://$1" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[^\d/-])(\d{3})-(\d{3})-(\d{4})(?![\d-])/g, '$1<a href="tel:+1$2$3$4">$2-$3-$4</a>');
 
   // ---------- Time helpers (always Halifax time) ----------
   const fmt = o => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, ...o });
@@ -257,27 +259,60 @@
 
   const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "the source"; } };
 
+  // Who a story's source is, by the site it's on: a notice's label, and how the byline names it
+  const SOURCES = [
+    [/(^|\.)halifaxwater\.ca$/, "Halifax Water", "Halifax Water's"],
+    [/(^|\.)halifax\.ca$/, "City notice", "the city's"],
+    [/(^|\.)rcmp\.ca$/, "RCMP", "the RCMP's"],
+    [/(^|\.)novascotia\.ca$/, "Province", "the Province's"],
+    [/(^|\.)weather\.gc\.ca$/, "Environment Canada", "Environment Canada's"],
+    [/(^|\.)nspower\.ca$/, "Nova Scotia Power", "Nova Scotia Power's"],
+  ];
+  const sourceOf = u => { const h = hostOf(u), s = SOURCES.find(x => x[0].test(h)); return s ? { label: s[1], whose: s[2] } : { label: "Notice", whose: "the official" }; };
+
+  // Newsroom style: "Nov. 6", with the year only when it isn't this one
+  const MONTHS = { January: "Jan.", February: "Feb.", August: "Aug.", September: "Sept.", October: "Oct.", November: "Nov.", December: "Dec." };
+  function storyDate(t) {
+    const d = new Date(t), month = fmt({ month: "long" }).format(d), year = fmt({ year: "numeric" }).format(d);
+    return `${MONTHS[month] || month} ${fmt({ day: "numeric" }).format(d)}${year === fmt({ year: "numeric" }).format(new Date()) ? "" : ", " + year}`;
+  }
+  const readTime = a => Math.max(1, Math.round([...a.body, ...(a.actions || []), ...a.means].join(" ").split(/\s+/).length / 200));
+  /** A line of a story's text: a string starting "## " is a subheading. */
+  const bodyLine = p => p.startsWith("## ") ? `<h2>${esc(p.slice(3))}</h2>` : `<p>${linkify(p)}</p>`;
+
   /** The article itself (shared by Developing and Articles views, and swapped in place on live updates). */
   function articleHTML(a) {
     const isNotice = a.kind === "notice";
     const newer = isNotice && a.supersededBy && (S.stories || []).find(s => s.id === a.supersededBy);
     const developing = a.kind === "article" && a.stage === "developing";
-    const showUpdate = developing && a.lastUpdate && a.updateNote;
+    // A version 1 story has never changed, whatever its last-written time says
+    const changed = a.version > 1 && a.lastUpdate;
+    const showUpdate = (developing || isNotice) && changed && a.updateNote && !newer;
     const mod = S.me && S.me.role === "moderator" && a.kind === "article";
+    const src = sourceOf(a.source), doc = isNotice ? "notice" : "release";
+    // Notices' points were always actions. An older article's stay at the bottom as "what this means"
+    const actions = a.actions && a.actions.length ? a.actions : isNotice ? a.means : [];
+    const oldMeans = !isNotice && a.means.length ? `<h2 class="means-h">What this means for you</h2><ul>${a.means.map(p => `<li>${linkify(p)}</li>`).join("")}</ul>` : "";
+    const facts = a.facts.length ? `<dl class="facts">${a.facts.map(f => `<dt>${esc(f.k)}</dt><dd>${linkify(f.v)}</dd>`).join("")}</dl>` : "";
+    const kicker = isNotice
+      ? src.label + (a.statusLabel ? " · " + esc(a.statusLabel) : "")
+      : (developing ? "Developing · " : "") + (a.section && a.section !== "City Hall" ? esc(a.section) + " · " : "") + esc(a.area || "Halifax");
     return `
       <article>
-        <div class="kicker${isNotice ? " notice" : ""}">${isNotice ? "City notice" + (a.statusLabel ? " · " + esc(a.statusLabel) : "") : (developing ? "Developing · " : "") + esc(a.section) + " · " + esc(a.area || "Halifax")}</div>
+        <div class="kicker${isNotice ? " notice" : ""}">${kicker}</div>
         <h1>${esc(a.headline)}</h1>
         ${a.dek ? `<p class="dek">${esc(a.dek)}</p>` : ""}
-        <div class="byline">${a.author ? `<span class="by">By <button type="button" class="by-link" data-user="${esc(a.author.id)}">${esc(a.author.name)}</button>, AI journalist</span>` : ""}<span class="ai">${isNotice ? "Rewritten by AI from an official notice, facts only" : "Written by AI from an official release"}</span><span>${fullDate(a.publishedAt)}</span>${a.lastUpdate ? `<span>Updated ${fullDate(a.lastUpdate)}, ${hm(a.lastUpdate)}</span>` : ""}${a.readMin ? `<span>${a.readMin} min read</span>` : ""}</div>
+        <p class="byline"><span>${a.author ? `<button type="button" class="by-link" data-user="${esc(a.author.id)}">${esc(a.author.name)}</button>, AI journalist · ` : ""}${storyDate(a.publishedAt)}${isNotice ? "" : ` · ${readTime(a)} min read`}${changed ? ` · Updated ${storyDate(a.lastUpdate)}, ${hm(a.lastUpdate)}` : ""}</span> <span>Written by AI from <a href="${esc(a.source)}" target="_blank" rel="noopener">${src.whose} ${doc}</a>${isNotice ? ", facts only" : ""}</span></p>
         ${showUpdate ? `<div class="updated-banner"><b>Latest update</b> · ${esc(ago(a.lastUpdate))}: ${esc(a.updateNote)}</div>` : ""}
         ${newer ? `<button type="button" class="banner" data-article="${esc(newer.id)}"><b>There's a newer update.</b> <span>${esc(newer.headline)} →</span></button>` : ""}
-        ${a.facts.length ? `<dl class="facts">${a.facts.map(f => `<dt>${esc(f.k)}</dt><dd>${linkify(f.v)}</dd>`).join("")}</dl>` : ""}
+        ${actions.length ? `<section class="todo"><h2>What to do</h2><ul>${actions.map(p => `<li>${linkify(p)}</li>`).join("")}</ul></section>` : ""}
+        ${isNotice ? facts : ""}
         <div class="body">
-          ${a.body.map(p => `<p>${linkify(p)}</p>`).join("")}
-          ${a.means.length ? `<h2>${isNotice ? "What to do" : "What this means for you"}</h2><ul>${a.means.map(p => `<li>${linkify(p)}</li>`).join("")}</ul>` : ""}
+          ${a.body.map(bodyLine).join("")}
+          ${oldMeans}
         </div>
-        <div class="source">Source: <a href="${esc(a.source)}" target="_blank" rel="noopener">original ${isNotice ? "notice" : "release"} on ${esc(hostOf(a.source))}</a>. Dates, times and places are copied from it; if anything differs, the original is right.</div>
+        ${!isNotice && facts ? `<section class="key-details"><h2>Key details</h2>${facts}</section>` : ""}
+        <div class="source">If anything here differs from <a href="${esc(a.source)}" target="_blank" rel="noopener">the original ${doc} on ${esc(hostOf(a.source))}</a>, the original is right.</div>
         ${a.author ? `<button type="button" class="author-card" data-user="${esc(a.author.id)}" aria-label="${esc(a.author.name)}'s profile">${avatar({ id: a.author.id, name: a.author.name })}<span><b>${esc(a.author.name)}</b><span class="ac-bio">${esc(a.author.bio)}</span><span class="ac-more">See all of ${esc(a.author.name.split(" ")[0])}'s stories →</span></span></button>` : ""}
         ${mod ? `<div class="stage-tools">Moderator: <button type="button" id="stageBtn" data-stage="${developing ? "archived" : "developing"}">${developing ? "Move to Articles (closes and clears the chat)" : "Move back to Developing"}</button></div>` : ""}
       </article>`;
@@ -316,7 +351,7 @@
     }
 
     if (a.kind === "notice") {
-      v.innerHTML = `<div class="room"><div>${back()}${articleHTML(a)}<p class="closed">Chat and comments are off for city notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p><div id="alertOffer"></div></div></div>`;
+      v.innerHTML = `<div class="room"><div>${back(a)}${articleHTML(a)}<p class="closed">Chat and comments are off for notices. For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>.</p><div id="alertOffer"></div></div></div>`;
       // Readers are offered alerts after opening a notice, never on a first visit to the site
       lazy("/alerts.js").then(() => { const o = $("#alertOffer"); if (o) window.THAlerts.offer(o); }).catch(() => {});
       wireStageTools(); window.scrollTo({ top: 0 }); return;
@@ -688,8 +723,9 @@
     box.innerHTML = drafts.length ? drafts.map(d => `<details class="draft glass">
         <summary><span class="k">${esc(d.kind)} · ${esc(d.area || "Halifax")}${d.author ? " · by " + esc(d.author) : ""} · ${ago(d.updatedAt)}</span><b>${esc(d.headline)}</b></summary>
         ${d.dek ? `<p class="dek-s">${esc(d.dek)}</p>` : ""}
+        ${(d.actions || []).length ? `<p><b>What to do</b></p><ul>${d.actions.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
         ${d.facts.length ? `<dl class="facts">${d.facts.map(f => `<dt>${esc(f.k)}</dt><dd>${esc(f.v)}</dd>`).join("")}</dl>` : ""}
-        ${d.body.map(p => `<p>${esc(p)}</p>`).join("")}
+        ${d.body.map(p => p.startsWith("## ") ? `<p><b>${esc(p.slice(3))}</b></p>` : `<p>${esc(p)}</p>`).join("")}
         ${d.means.length ? `<ul>${d.means.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
         <p class="src-s">Source: <a href="${esc(d.source)}" target="_blank" rel="noopener">${esc(d.source)}</a></p>
         <div class="review-acts">

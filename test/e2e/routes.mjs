@@ -27,6 +27,12 @@ const SEED = STORIES.map(s => `INSERT INTO stories (id, kind, section, area, hea
 const WEATHER = JSON.stringify({ updatedAt: now, observedAt: now, station: "Test", condition: "Sunny", tempC: 15, feelsLikeC: 15, icon: "clear", night: false, url: "https://weather.gc.ca/" });
 const waterNotice = (id, headline) => `INSERT INTO stories (id, kind, section, area, headline, dek, facts, body, means, source_url, published_at, updated_at, stage, developing_since) VALUES (${[id, "notice", "Halifax Water", "Halifax", headline, "A dek", "[]", '["A sentence."]', "[]", "https://www.halifaxwater.ca/", now, now, "developing", now].map(q).join(", ")});`;
 const SEED_WATER = waterNotice("hw-e2e-shutoff", "One Street - Emergency Water Service Shut Down") + waterNotice("hw-e2e-boil", "Boil Water Advisory for one area");
+// The article page's layout: a new article, an older one, and a notice that changed
+const story = (id, kind, section, source, version, note, facts, body, means, actions) => `INSERT INTO stories (id, kind, section, area, headline, dek, facts, body, means, actions, source_url, published_at, updated_at, last_newsroom_update, update_note, version, stage, developing_since) VALUES (${[id, kind, section, "Halifax", id, "A dek", facts, body, means, actions, source, now, now, now, note, version, "developing", now].map(v => typeof v === "number" ? v : q(v)).join(", ")});`;
+const FACTS = '[{"k":"Call","v":"902-555-0100"}]';
+const SEED_LAYOUT = story("e2e-new", "article", "Province", "https://news.novascotia.ca/x", 1, "", FACTS, '["First.","## A subheading","Second."]', "[]", '["Do this by Friday."]')
+  + story("e2e-old", "article", "City Hall", "https://www.halifax.ca/x", 1, "", FACTS, '["First."]', '["An older point."]', "[]")
+  + story("hw-e2e-changed", "notice", "Halifax Water", "https://www.halifaxwater.ca/x", 2, "The advisory was lifted", FACTS, '["First."]', '["Boil water."]', "[]");
 const SEED_WEATHER = `INSERT INTO feeds (name, body, updated_at) VALUES ('weather', '${WEATHER}', '${now}');`;
 
 function browserPath() {
@@ -44,7 +50,7 @@ const ok = (c, label, extra = "") => { console.log(`${c ? "PASS" : "FAIL"} ${lab
 
 rmSync(DATA, { recursive: true, force: true });
 npx([...WRANGLER, "d1", "migrations", "apply", "talkhalifax-test", "--local", "--persist-to", DATA]);
-writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WATER} ${SEED_WEATHER}`);
+writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WATER} ${SEED_LAYOUT} ${SEED_WEATHER}`);
 npx([...WRANGLER, "d1", "execute", "talkhalifax-test", "--local", "--persist-to", DATA, "--file", `${DATA}/seed.sql`]);
 
 const server = spawn("npx", [...WRANGLER, "dev", "--port", String(PORT), "--persist-to", DATA], { stdio: "ignore", shell: win, detached: !win, env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
@@ -138,6 +144,37 @@ try {
       const n = await open("notices");
       ok((await n.evaluate(() => document.getElementById("notices").innerText)).includes("One Street"), `${label}: the shut-off is on Notices`);
       await n.close();
+    }
+
+    // The article page: what comes first, and what it says about itself
+    {
+      const read = async id => {
+        const a = await open("article-" + id);
+        await heading(a, id);
+        const out = await a.evaluate(() => {
+          const r = document.querySelector("#article article");
+          const at = s => { const e = r.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top + scrollY) : -1; };
+          return { text: r.innerText, back: document.querySelector("#article .back").innerText, kicker: r.querySelector(".kicker").innerText, byline: r.querySelector(".byline").innerText, sub: r.querySelector(".body h2:not(.means-h)")?.innerText,
+            todo: at(".todo"), body: at(".body"), facts: at(".facts"), means: at(".means-h"), wide: document.documentElement.scrollWidth > innerWidth, tel: r.querySelector('.facts a[href^="tel:"]')?.innerText };
+        });
+        await a.close();
+        return out;
+      };
+      const n = await read("e2e-new");
+      ok(n.todo > 0 && n.todo < n.body && n.body < n.facts, `${label}: a new article runs what to do, story, key details`, JSON.stringify(n));
+      ok(n.sub === "A subheading" && !n.text.includes("## "), `${label}: a body line starting ## is a subheading`);
+      ok(!n.byline.includes("Updated"), `${label}: a story that never changed doesn't say Updated`, n.byline);
+      ok(/1 min read/.test(n.byline) && /the Province's release/.test(n.byline), `${label}: the byline gives read time and names the source`, n.byline);
+      ok(n.kicker.toUpperCase().includes("PROVINCE"), `${label}: an article outside City Hall names its section`, n.kicker);
+      ok(n.tel === "902-555-0100", `${label}: a phone number can be tapped`, n.tel);
+      ok(!n.wide, `${label}: the story fits the width`);
+      const o = await read("e2e-old");
+      ok(o.todo === -1 && o.means > o.body && o.facts > o.means, `${label}: an older article keeps its points at the bottom`, JSON.stringify(o));
+      const w = await read("hw-e2e-changed");
+      ok(w.kicker.toUpperCase().startsWith("HALIFAX WATER"), `${label}: a notice names its real source`, w.kicker);
+      ok(w.back.includes("Notices"), `${label}: a notice goes back to Notices`, w.back);
+      ok(w.todo > 0 && w.todo < w.facts && w.facts < w.body, `${label}: a notice runs what to do, facts, story`, JSON.stringify(w));
+      ok(w.byline.includes("Updated") && w.text.includes("The advisory was lifted"), `${label}: a changed notice says so, and why`, w.byline);
     }
 
     // Moving between pages without reloading
