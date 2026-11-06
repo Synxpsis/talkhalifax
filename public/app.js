@@ -1040,6 +1040,7 @@
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
   const VIEWS = ["home", "articles", "notices", "events", "transit", "profile", "privacy"];
   function show(v) {
+    let toAlerts = false;
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (v.startsWith("user-")) {
       const id = v.slice(5);
@@ -1049,8 +1050,7 @@
     else if (v.startsWith("reset-")) { S.resetToken = v.slice(6); v = "reset"; }
     else if (v.startsWith("transit")) { S.transitRoute = decodeURIComponent(v.slice(8)); v = "transit"; }
     // Alerts are a section of the profile, so old #alerts links land there
-    const toAlerts = v === "alerts";
-    if (toAlerts) v = "profile";
+    else if (v === "alerts") { toAlerts = true; v = "profile"; }
     else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     if (v !== "transit") window.THTransit?.close();
