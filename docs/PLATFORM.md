@@ -71,7 +71,7 @@ P3 `decisions`, P4 `community`.
 | Source | Used for | How |
 |---|---|---|
 | halifax.ca news releases | Articles and notices | `scan_sources`, `read_release` |
-| halifaxwater.ca notices, alerts and news | Water notices (boil-water advisories, shut-offs, main repairs, traffic advisories) | same; `scan_sources` lists it under `unavailable` if the site can't be read |
+| halifaxwater.ca notices, alerts and news | Water notices (boil-water advisories, shut-offs, main repairs, traffic advisories) | same; `scan_sources` lists it under `unavailable` if the site can't be read, and marks `sourceChanged` on a page edited since we last handled it. Urgent notices get hourly check-ins |
 | news.novascotia.ca | Provincial stories that touch Halifax | same |
 | rcmp.ca (Halifax-area detachments) | Police notices, always reviewed | same |
 | Environment Canada | Weather warnings (notices and banners), current conditions (header and menu) | `conditions`, cron |

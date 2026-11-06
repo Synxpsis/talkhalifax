@@ -5,7 +5,8 @@ export const HALIFAX_WATER = "https://www.halifaxwater.ca";
 // Six older notices to a page; two pages reach back about a week
 export const WATER_PAGES = ["/notices-and-news", "/notices-and-news?page=1", "/alerts"];
 
-export interface WaterItem { path: string; type: "notice" | "alert" | "news"; title: string; publishedAt: string; summary: string }
+// Halifax Water edits a notice on the same page rather than issuing a new one, so `changedAt` is when it last changed
+export interface WaterItem { path: string; type: "notice" | "alert" | "news"; title: string; publishedAt: string; changedAt: string; summary: string }
 
 const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const ENT: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", ndash: "–", mdash: "—", hellip: "…" };
@@ -35,14 +36,22 @@ export function parseWaterListing(html: string): WaterItem[] {
     const title = text(m[0].match(/<h2[^>]*>([\s\S]*?)<\/h2>/)?.[1] || "");
     const publishedAt = waterDate(text(m[0].match(/class='date-published'>([\s\S]*?)<\/div>/)?.[1] || ""));
     const body = m[0].match(/field--name-field-body[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/)?.[1] || "";
-    if (title && publishedAt) found.set(m[1], { path: m[1], type: m[2] as WaterItem["type"], title, publishedAt, summary: text(body).slice(0, 280) });
+    const updated = waterDate(text(m[0].match(/Updated:\s*<\/span>([\s\S]*?)<\/span>/)?.[1] || ""));
+    if (title && publishedAt) found.set(m[1], { path: m[1], type: m[2] as WaterItem["type"], title, publishedAt, changedAt: later(publishedAt, updated), summary: text(body).slice(0, 280) });
   }
+  // A plain row's time is when the item last changed, so it can also be newer than the card for the same item
   for (const m of html.matchAll(/<a href="(\/(notice|alert|news)\/[^"]+)" hreflang="en">([^<]+)<\/a>[\s\S]{0,300}?<time datetime="([^"]+)"/g)) {
     const t = Date.parse(m[4]);
-    if (!found.has(m[1]) && t) found.set(m[1], { path: m[1], type: m[2] as WaterItem["type"], title: text(m[3]), publishedAt: iso(t), summary: "" });
+    if (!t) continue;
+    const card = found.get(m[1]);
+    if (card) card.changedAt = later(card.changedAt, iso(t));
+    else found.set(m[1], { path: m[1], type: m[2] as WaterItem["type"], title: text(m[3]), publishedAt: iso(t), changedAt: iso(t), summary: "" });
   }
   return [...found.values()];
 }
+
+/** The later of two ISO UTC times, either of which may be missing. */
+export const later = (a: string, b?: string | null) => (b && b > a ? b : a);
 
 /** How soon the newsroom should get to it: anything affecting water or roads in the next hours comes first. */
 export function waterCategory(item: Pick<WaterItem, "type" | "title">) {

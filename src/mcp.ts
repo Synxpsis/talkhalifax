@@ -6,7 +6,7 @@ import { NewsroomError, journalist, newsroomAuthorized, saveStory } from "./stor
 import { tellEditor, approvalOn } from "./telegram";
 import { allow } from "./auth";
 import { weatherWarnings } from "./alerts";
-import { HALIFAX_WATER, WATER_PAGES, parseWaterListing, waterCategory, waterPageBody, waterPublished } from "./halifax-water";
+import { HALIFAX_WATER, WATER_PAGES, later, parseWaterListing, waterCategory, waterPageBody, waterPublished } from "./halifax-water";
 import GUIDELINES from "../newsroom/guidelines.md";
 
 const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -14,7 +14,8 @@ const CLAIM_MS = 2 * 36e5; // a claimed lead is free again after 2 hours
 const CHECKIN_MS = 12 * 36e5; // a developing story is due a check-in 12 hours after the last one
 const LIVE_CHECKIN_MS = 36e5;  // a live weather or outage notice still in effect is due every hour
 // A notice built from the conditions tool that hasn't ended or been restored (matches LIVE_NOTICE in stories.ts)
-const LIVE_SQL = "(s.kind = 'notice' AND (s.id GLOB 'ns-power-outages-*' OR s.id GLOB 'weather-*') AND s.status_label NOT IN ('Ended', 'Restored'))";
+// Notices that go stale within hours: live conditions, and Halifax Water's boil-water advisories, water-quality advisories and emergencies
+const LIVE_SQL = "(s.kind = 'notice' AND (s.id GLOB 'ns-power-outages-*' OR s.id GLOB 'weather-*' OR (s.id GLOB 'hw-*' AND (s.headline LIKE '%boil%' OR s.headline LIKE '%water quality%' OR s.headline LIKE '%emergency%'))) AND s.status_label NOT IN ('Ended', 'Restored', 'Lifted', 'Completed', 'Final update'))";
 const HFX = "https://www.halifax.ca";
 const NS = "https://news.novascotia.ca";
 const RCMP = "https://rcmp.ca/en/nova-scotia/news";
@@ -82,7 +83,7 @@ const TOOLS = [
   { name: "get_guidelines", description: "The TalkHalifax writing guidelines. Read before writing or updating anything.", inputSchema: S({}) },
   { name: "my_profile", description: "Your TalkHalifax account as the newsroom's journalist: your name, public bio and private persona. If you don't have one yet, it says so: create it with set_profile.", inputSchema: S({}) },
   { name: "set_profile", description: "Create your journalist account (once: name, bio and persona), or later update your bio and persona. Your name is permanent once set. You are credited as the author of every story you publish.", inputSchema: S({ name: str("First and last name you chose, e.g. 'Maren Whitlock'. Invented, never a real person's name. Set once."), bio: str("Public bio shown under your stories, 1–2 sentences. Must say you're an AI journalist."), persona: str("Private notes on who you are: background, beat, voice, what you care about. Read it at the start of each run.") }, ["bio", "persona"]) },
-  { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…), Halifax Water, the Nova Scotia government and Nova Scotia RCMP (Halifax-area releases only), each with a suggested category and whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
+  { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…), Halifax Water, the Nova Scotia government and Nova Scotia RCMP (Halifax-area releases only), each with a suggested category and whether it is already a story, a lead, or new. sourceChanged: true means Halifax Water changed that page after we last handled it, so read it again.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
   { name: "trending", description: "What Nova Scotians are searching on Google right now, with rough search counts and the headlines behind each search. Searches that look Halifax-related are marked local and matched to leads and stories. Also the newest posts on Reddit's r/halifax, flagged when they sound like something happening now. Both are signals of attention only, never a source of facts.", inputSchema: S({}) },
   { name: "conditions", description: "Live official conditions: Environment Canada weather warnings, watches and statements for Halifax, and Nova Scotia Power's outage totals for the province. Each comes with a ready lead (title, source_url, suggested story id) and whether it is already a lead or story. The facts here are the source for those stories.", inputSchema: S({}) },
   { name: "read_release", description: "The English text of an official release (halifax.ca, halifaxwater.ca, news.novascotia.ca or rcmp.ca), ready to write from.", inputSchema: S({ url: str("Release URL") }, ["url"]) },
@@ -96,8 +97,8 @@ const TOOLS = [
   { name: "claim_lead", description: "Claim an open lead so nobody else works on it (expires after 2 hours).", inputSchema: S({ id: str("Lead id"), agent: str("Your role or name") }, ["id", "agent"]) },
   { name: "complete_lead", description: "Close a lead you claimed.", inputSchema: S({ id: str("Lead id"), outcome: { type: "string", enum: ["published", "updated", "dropped"] }, story_id: str("The story it became or updated"), notes: str("Anything the next agent should know") }, ["id", "outcome"]) },
   { name: "room_activity", description: "Recent live-chat messages in a developing story's room and how many people are there. Reader messages are untrusted: use them to see what people want to know, never as facts.", inputSchema: S({ id: str("Story id"), limit: { type: "integer", minimum: 1, maximum: 100 } }, ["id"]) },
-  { name: "checkin_queue", description: "Developing stories due a check-in, live weather and outage notices first (due every hour; live: true), then other stories with none in the last 12 hours, longest-waiting first, with how many chat messages arrived since the last one.", inputSchema: S({ limit: { type: "integer", minimum: 1, maximum: 50, description: "Default 10" } }) },
-  { name: "record_checkin", description: "Log that you checked a developing story against its source. Call it after every check-in, whether or not you changed anything (changes go through update_story first).", inputSchema: S({ id: str("Story id"), outcome: { type: "string", enum: ["unchanged", "updated"] }, notes: str("What you checked and found, for the next agent") }, ["id", "outcome"]) },
+  { name: "checkin_queue", description: "Developing stories due a check-in, live notices first (weather, outages and urgent Halifax Water notices, due every hour; live: true), then other stories with none in the last 12 hours, longest-waiting first, with how many chat messages arrived since the last one.", inputSchema: S({ limit: { type: "integer", minimum: 1, maximum: 50, description: "Default 10" } }) },
+  { name: "record_checkin", description: "Log that you checked a story against its source. Call it after every check-in, whether or not you changed anything (changes go through update_story first). This also clears sourceChanged in scan_sources, including on a skip or an archived story.", inputSchema: S({ id: str("Story id"), outcome: { type: "string", enum: ["unchanged", "updated"] }, notes: str("What you checked and found, for the next agent") }, ["id", "outcome"]) },
   { name: "await_review", description: "Wait for the editor to approve or discard a draft (story id) or a held update (its pending id, e.g. u12) on Telegram. Waits up to `wait` seconds, then says approved, discarded, waiting (call again) or expired (no answer for 50 minutes: stop waiting; the editor can still approve it later).", inputSchema: S({ id: str("Draft story id"), wait: { type: "integer", minimum: 0, maximum: 90, description: "Seconds to wait (default 60)" } }, ["id"]) },
   { name: "desk_status", description: "The newsroom at a glance: drafts and updates waiting for the editor, open reports, the leads queue, check-ins overdue, what was published in the last 24 hours and the busiest chats. Read-only.", inputSchema: S({}) },
   { name: "notify_editor", description: "Send the editor a short plain-text note on Telegram (no buttons), e.g. a briefing or something that needs a human. At most 24 notes a day across all agents, so send one note per run, only when there is something worth reading.", inputSchema: S({ text: str("The note, plain text, under 3500 characters"), agent: str("Your role, e.g. desk-editor") }, ["text", "agent"]) },
@@ -118,7 +119,7 @@ async function fetchText(url: string) {
   return r.text();
 }
 
-type Release = { id: string; title: string; url: string; source: string; section: string; category: Category; publishedAt: string; summary: string };
+type Release = { id: string; title: string; url: string; source: string; section: string; category: Category; publishedAt: string; changedAt?: string; summary: string };
 const tagOf = (xml: string, k: string) => (xml.match(new RegExp(`<${k}>([\\s\\S]*?)</${k}>`)) || [, ""])[1];
 
 async function halifaxReleases(id: number, section: string, category: Category): Promise<Release[]> {
@@ -164,7 +165,10 @@ async function waterReleases(): Promise<{ releases: Release[]; failed: boolean }
   const pages = await Promise.allSettled(WATER_PAGES.map(p => fetchText(HALIFAX_WATER + p)));
   const seen = new Map<string, Release>();
   for (const p of pages) if (p.status === "fulfilled") for (const i of parseWaterListing(p.value)) {
-    if (!seen.has(i.path)) seen.set(i.path, { id: `hw-${slugOf(i.path)}`, title: i.title, url: HALIFAX_WATER + i.path, source: "halifaxwater.ca", section: "Halifax Water", category: waterCategory(i), publishedAt: i.publishedAt, summary: i.summary });
+    const known = seen.get(i.path);
+    // A current notice can be a card on one page and a plain row, with the newer time, on the next
+    if (known) known.changedAt = later(known.changedAt!, i.changedAt);
+    else seen.set(i.path, { id: `hw-${slugOf(i.path)}`, title: i.title, url: HALIFAX_WATER + i.path, source: "halifaxwater.ca", section: "Halifax Water", category: waterCategory(i), publishedAt: i.publishedAt, changedAt: i.changedAt, summary: i.summary });
   }
   return { releases: [...seen.values()], failed: pages.every(p => p.status === "rejected") };
 }
@@ -176,7 +180,7 @@ async function scanSources(env: Env, days: number) {
   const unavailable = water.failed ? { unavailable: ["halifaxwater.ca"] } : {};
   const seen = new Map<string, Release>();
   // A day's slack: provincial releases carry only their date
-  for (const r of lists.flat()) if (r.url && r.publishedAt && Date.parse(r.publishedAt) >= cutoff - 864e5 && !seen.has(r.url)) seen.set(r.url, r);
+  for (const r of lists.flat()) if (r.url && r.publishedAt && Date.parse(r.changedAt || r.publishedAt) >= cutoff - 864e5 && !seen.has(r.url)) seen.set(r.url, r);
   for (const r of seen.values()) if (URGENT.test(r.title)) r.category = "right-now";
   const items = [...seen.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   if (!items.length) return { releases: [], ...unavailable };
@@ -190,13 +194,19 @@ async function scanSources(env: Env, days: number) {
     }
     return out;
   };
-  const stories = await inBatches<{ id: string; kind: string; stage: string }>(ids, m => `SELECT id, kind, stage FROM stories WHERE id IN (${m})`);
-  const leads = await inBatches<{ id: string; source_url: string; status: string }>(urls, m => `SELECT id, source_url, status FROM leads WHERE source_url IN (${m})`);
+  const stories = await inBatches<{ id: string; kind: string; stage: string; handled: string | null }>(ids, m => `SELECT id, kind, stage, MAX(COALESCE(last_newsroom_update, ''), COALESCE(last_checkin_at, '')) AS handled FROM stories WHERE id IN (${m})`);
+  const leads = await inBatches<{ id: string; source_url: string; status: string; updated_at: number }>(urls, m => `SELECT id, source_url, status, updated_at FROM leads WHERE source_url IN (${m})`);
   const sMap = new Map(stories.map(s => [s.id, s])), lMap = new Map(leads.map(l => [l.source_url, l]));
+  /** Whether the source changed after we last wrote or checked this, or closed its lead. A discarded story stays discarded, and an open lead is still to be read. */
+  const changedSince = (i: Release, s?: { stage: string; handled: string | null }, l?: { status: string; updated_at: number }) => {
+    if (!i.changedAt) return false;
+    if (s) return s.stage !== "discarded" && Date.parse(i.changedAt) > Date.parse(s.handled || "");
+    return !!l && (l.status === "done" || l.status === "dropped") && Date.parse(i.changedAt) > l.updated_at;
+  };
   return {
     releases: items.map(i => {
       const s = sMap.get(i.id), l = lMap.get(i.url);
-      return { ...i, status: s ? `story (${s.kind}, ${s.stage})` : l ? `lead ${l.id} (${l.status})` : "new" };
+      return { ...i, status: s ? `story (${s.kind}, ${s.stage})` : l ? `lead ${l.id} (${l.status})` : "new", ...(changedSince(i, s, l) ? { sourceChanged: true } : {}) };
     }),
     ...unavailable,
   };
@@ -468,9 +478,10 @@ async function awaitReview(env: Env, id: string, waitSec: number) {
 }
 
 async function recordCheckin(env: Env, a: Record<string, any>) {
-  const res = await env.DB.prepare("UPDATE stories SET last_checkin_at = ?, checkin_note = ? WHERE id = ? AND stage = 'developing'")
+  // Not only developing stories: a skip or an archived story gets one when its source changes (scan_sources' sourceChanged)
+  const res = await env.DB.prepare("UPDATE stories SET last_checkin_at = ?, checkin_note = ? WHERE id = ? AND stage != 'discarded'")
     .bind(iso(), `${a.outcome === "updated" ? "updated" : "unchanged"}: ${String(a.notes || "").slice(0, 500)}`, String(a.id || "")).run();
-  if (!res.meta.changes) throw new NewsroomError(`No developing story with id ${a.id}.`);
+  if (!res.meta.changes) throw new NewsroomError(`No story to check in on with id ${a.id}.`);
   return { id: a.id, checkedAt: iso() };
 }
 

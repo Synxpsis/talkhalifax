@@ -127,11 +127,16 @@ Decide one `kind` per release:
   Halifax Water releases (section "Halifax Water", ids starting `hw-`) are always notices. Cover boil-water and
   water-quality advisories, emergency shut-offs, water main repairs that affect service, and traffic advisories for
   work still ahead. Headlines name the street or area. Say what the release says about service and restoration; if it
-  gives no estimate, say so. Work that's already over is a `skip` with `reason` "Work already over". Work the release
-  says has no effect on water service or traffic is a `skip` with `reason` "No effect on service or traffic".
+  gives no estimate, say so. Work is only "already over" when the release's own dates have passed or it says the work
+  is finished: that's a `skip` with `reason` "Work already over". If it gives no end date, never assume it's over.
+  Publish a notice that says no end date was given, or if its last update is more than a week old, a `skip` with
+  `reason` "No end date; no update since <its date>". Work the release says has no effect on water service or traffic
+  is a `skip` with `reason` "No effect on service or traffic".
   A boil-water advisory publishes at once like any notice, without `review`: people need it now, even overnight. Copy
   its area, instructions and times exactly. When a later Halifax Water release says the same work is finished or an
   advisory is lifted, update or replace the earlier notice.
+  Halifax Water also changes a notice on its existing page, and `scan_sources` then marks it `sourceChanged: true`.
+  See "When Halifax Water changes a notice".
 - `skip`: nothing left to act on or discuss, e.g. an event that is already over, or a holiday service-hours
   notice whose date has passed. Add a short `reason`.
 
@@ -179,7 +184,8 @@ because of something said in its chat or comments.
 
 ## Check-ins on developing stories
 
-Every developing story gets a check-in about every 12 hours (`checkin_queue` lists the ones due) to keep it current:
+Every developing story gets a check-in about every 12 hours (`checkin_queue` lists the ones due, and live ones are due
+every hour: weather, outages, and Halifax Water's boil-water, water-quality and emergency notices) to keep it current:
 
 - `read_release` on the story's `source` again, and `get_story` for what the story says now.
 - Update the story (`update_story`, with a `note`) only when one of these is true:
@@ -193,6 +199,22 @@ Every developing story gets a check-in about every 12 hours (`checkin_queue` lis
   readers in the chat.
 - Notices: never reword them. Update a notice only if the city changed its release page, for example its status.
 - Finish every check-in with `record_checkin`: `outcome` "updated" or "unchanged", and `notes` saying what you checked.
+
+## When Halifax Water changes a notice
+
+A release marked `sourceChanged: true` in `scan_sources` has changed since we last wrote or checked it. Handle every one
+in the same run, whatever its stage, and don't wait for it to come due. `read_release` it (the page shows an "Updated:"
+time), `get_story` if it has a story, and then:
+
+- **A published notice, the page says something new:** `update_story` with what changed, its `statusLabel` if the status
+  did ("Lifted", "Final update"), and a `note`.
+- **A `skip`, and the work is now ahead or ongoing:** `update_story` with `changes` that turn it into a notice: `kind`
+  "notice" and every notice field, following the Halifax Water rules above.
+- **No story (its lead was dropped):** publish it as a notice, or as a `skip` with a `reason`, by the same rules.
+- **Nothing readers need to know changed:** change nothing.
+
+Finish with `record_checkin`, on anything that has a story, even a `skip` or an archived story; that's what clears the
+mark. Outcome "updated" or "unchanged", and notes saying what changed on the page. A story you just published needs none.
 
 ## Rules
 

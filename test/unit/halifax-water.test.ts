@@ -28,6 +28,12 @@ describe("reading Halifax Water's listings", () => {
     expect(items[1]).toMatchObject({ type: "notice", publishedAt: "2026-11-04T13:32:39Z", summary: "" });
     expect(items[2].title).toBe("Halifax Water Rates Finalized & Approved");
   });
+  it("knows when an item last changed, from a plain row or a card's own Updated time", () => {
+    expect(items[0].changedAt).toBe("2026-11-02T18:40:00Z");
+    expect(items[1].changedAt).toBe("2026-11-04T13:32:39Z");
+    const edited = card("/notice/hammonds", "Hammonds Plains Road", "9:32 PM | November 1, 2026", "Work.").replace("</div> <div class=\"field field--name-field-body", "</div> <div class='date-updated'> <span class='field-label'>Updated: </span> <span class='field-value'>6:37 AM | November 3, 2026</span> </div> <div class=\"field field--name-field-body");
+    expect(parseWaterListing(edited)[0]).toMatchObject({ publishedAt: "2026-11-02T01:32:00Z", changedAt: "2026-11-03T10:37:00Z" });
+  });
   it("reads Halifax's clock in winter and in summer", () => {
     expect(waterDate("2:34 PM | November 2, 2026")).toBe("2026-11-02T18:34:00Z");
     expect(waterDate("9:08 AM | July 2, 2026")).toBe("2026-07-02T12:08:00Z");
@@ -113,6 +119,63 @@ describe("the newsroom's tools", () => {
     const many = Array.from({ length: 120 }, (_, i) => row(`/notice/repair-${i}`, `Repair ${i}`, recent)).join("");
     stubWater(() => new Response(many));
     expect(JSON.parse((await call("scan_sources", { days: 3 })).text).releases).toHaveLength(120);
+  });
+  describe("a notice changed on its existing page", () => {
+    const hours = (n: number) => new Date(Date.now() - n * 36e5).toISOString();
+    const stamp = (n: number) => hours(n).replace(/\.\d+Z$/, "-00:00");
+    const addStory = (id: string, kind: string, stage: string, handled: string, checked: string | null = null, headline = "Water work", status = "") => env.DB.prepare(
+      "INSERT INTO stories (id, kind, headline, source_url, published_at, stage, status_label, last_newsroom_update, last_checkin_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).bind(id, kind, headline, `https://www.halifaxwater.ca/notice/${id.slice(3)}`, handled, stage, status, handled, checked, handled).run();
+    const scan = async (slug: string, changed: number) => {
+      stubWater(() => new Response(row(`/notice/${slug}`, "Water work", stamp(changed))));
+      return JSON.parse((await call("scan_sources", { days: 3 })).text).releases.find((r: { id: string }) => r.id === `hw-${slug}`);
+    };
+
+    it("marks a skip whose page changed after we wrote it, but not one that hasn't", async () => {
+      await addStory("hw-skip-changed", "skip", "developing", hours(5));
+      expect(await scan("skip-changed", 1)).toMatchObject({ status: "story (skip, developing)", sourceChanged: true });
+      await addStory("hw-skip-same", "skip", "developing", hours(1));
+      expect((await scan("skip-same", 5)).sourceChanged).toBeUndefined();
+    });
+    it("record_checkin clears the mark, even on a skip or an archived story", async () => {
+      for (const [slug, stage] of [["cleared-skip", "developing"], ["cleared-old", "archived"]]) {
+        await addStory(`hw-${slug}`, "skip", stage, hours(5));
+        expect((await scan(slug, 1)).sourceChanged).toBe(true);
+        expect((await call("record_checkin", { id: `hw-${slug}`, outcome: "unchanged", notes: "Same work" })).error).toBeFalsy();
+        expect((await scan(slug, 1)).sourceChanged).toBeUndefined();
+      }
+    });
+    it("leaves a story the editor discarded alone", async () => {
+      await addStory("hw-binned", "notice", "discarded", hours(5));
+      expect((await scan("binned", 1)).sourceChanged).toBeUndefined();
+      expect((await call("record_checkin", { id: "hw-binned", outcome: "unchanged" })).text).toMatch(/No story/);
+    });
+    it("brings back a dropped lead, but not one still in the queue", async () => {
+      const lead = (id: string, slug: string, status: string) => env.DB.prepare("INSERT INTO leads (id, title, source_url, status, created_at, updated_at) VALUES (?, 'Water work', ?, ?, ?, ?)")
+        .bind(id, `https://www.halifaxwater.ca/notice/${slug}`, status, Date.now() - 5 * 36e5, Date.now() - 5 * 36e5).run();
+      await lead("l_dropped", "lead-dropped", "dropped");
+      expect(await scan("lead-dropped", 1)).toMatchObject({ status: "lead l_dropped (dropped)", sourceChanged: true });
+      await lead("l_open", "lead-open", "open");
+      expect((await scan("lead-open", 1)).sourceChanged).toBeUndefined();
+    });
+    it("still lists a card published long ago if it changed recently", async () => {
+      const old = card("/notice/old-card", "Old card", "9:32 PM | January 1, 2026", "Work.") + row("/notice/old-card", "Old card", stamp(1));
+      stubWater(() => new Response(old));
+      const d = JSON.parse((await call("scan_sources", { days: 3 })).text);
+      expect(d.releases.map((r: { id: string }) => r.id)).toContain("hw-old-card");
+    });
+    it("checks urgent notices hourly until they're lifted, and routine work every 12 hours", async () => {
+      const due = async () => JSON.parse((await call("checkin_queue", { limit: 50 })).text).due as { id: string; live: boolean }[];
+      await addStory("hw-boil", "notice", "developing", hours(3), hours(2), "Boil Water Advisory for Pockwock");
+      await addStory("hw-woodys", "notice", "developing", hours(3), hours(2), "Woodys Lane – Emergency Water Service Shut Down");
+      await addStory("hw-lifted", "notice", "developing", hours(3), hours(2), "Boil Water Advisory for Bedford", "Lifted");
+      await addStory("hw-valve", "notice", "developing", hours(3), hours(2), "Colby Drive Water Valve Repair");
+      const list = await due();
+      expect(list.find(s => s.id === "hw-boil")?.live).toBe(true);
+      expect(list.find(s => s.id === "hw-woodys")?.live).toBe(true);
+      expect(list.find(s => s.id === "hw-lifted")).toBeUndefined();
+      expect(list.find(s => s.id === "hw-valve")).toBeUndefined();
+    });
   });
   it("read_release gives the notice alone, with the right date and id", async () => {
     stubWater(() => new Response(PAGE));
