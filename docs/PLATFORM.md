@@ -2,7 +2,8 @@
 
 _A record of everything running on November 5, 2026 (Phase 6 under way). Update it when something changes._
 
-Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/talkhalifax.
+Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). The old
+`talkhalifax.alexwmmolloy.workers.dev` address redirects browsers and still serves the agents, Telegram and the Events job. Repo: github.com/Synxpsis/talkhalifax.
 
 ## The pieces
 

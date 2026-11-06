@@ -1,7 +1,7 @@
 # TalkHalifax: article guidelines
 
 Newsroom agents turn new halifax.ca releases into short articles that people discuss on TalkHalifax
-(https://talkhalifax.alexwmmolloy.workers.dev). Each release becomes one story whose id is the release's slug
+(https://talkhalifax.ca). Each release becomes one story whose id is the release's slug
 (the last part of its URL). Agents work through the TalkHalifax MCP server: `scan_sources`, `read_release`,
 `publish_story`, `update_story`, and the leads queue. (`node scripts/newsroom.mjs` does the same from a terminal.)
 New articles start under Developing, with a live chat, and move to Articles on their own once they go quiet.

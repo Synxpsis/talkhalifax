@@ -1,4 +1,4 @@
-import { Env, json } from "./env";
+import { Env, json, SITE } from "./env";
 import { allow, currentUser, handleAuth, makeResetToken, providers, sameOrigin } from "./auth";
 import { deleteAccount, listReports, report, resolveReport, setBanned } from "./moderation";
 import { addComment, archiveStory, deleteComment, evaluateStages, listComments, listDrafts, newsroom, reopenStory, reviewDraft } from "./stories";
@@ -252,9 +252,24 @@ async function watchCron(env: Env, results: (readonly [string, PromiseSettledRes
   if (notes.length) await tellEditor(env, `🛠 <b>Site cron</b> (every 30 minutes)\n\n${notes.join("\n")}`);
 }
 
+// Readers belong on SITE. The other domains redirect for good. The old workers.dev address redirects only browsers opening
+// a page, because the newsroom agents, the Telegram webhook and the Events job still work through it.
+const OTHER_DOMAINS = /^(www\.talkhalifax\.ca|(www\.)?talkhalifax\.(com|org))$/;
+const OLD_HOST = "talkhalifax.alexwmmolloy.workers.dev";
+const BACKEND = /^\/(api|auth|mcp|telegram|rooms)(\/|$)/;
+function redirectToSite(req: Request, url: URL) {
+  if (req.method !== "GET" && req.method !== "HEAD") return null;
+  const to = SITE + url.pathname + url.search;
+  if (OTHER_DOMAINS.test(url.hostname)) return Response.redirect(to, 301);
+  if (url.hostname === OLD_HOST && req.headers.get("sec-fetch-mode") === "navigate" && !BACKEND.test(url.pathname)) return Response.redirect(to, 302);
+  return null;
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+    const moved = redirectToSite(req, url);
+    if (moved) return moved;
     try {
       if (url.pathname.startsWith("/auth/")) return (await handleAuth(req, env, url)) ?? new Response("Not found", { status: 404 });
       if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);

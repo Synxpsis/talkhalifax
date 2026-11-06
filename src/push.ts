@@ -1,10 +1,9 @@
 // Web Push alerts for urgent notices. Readers opt in on /#alerts; nothing is sent until the editor taps "Send alert"
 // on Telegram for a notice. Delivery follows RFC 8291 (aes128gcm encryption) and RFC 8292 (VAPID), with WebCrypto.
 // Secrets: VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY (base64url), made and stored by `node scripts/vapid-keys.mjs`.
-import { Env, json } from "./env";
+import { Env, json, SITE } from "./env";
 import { allow, sameOrigin } from "./auth";
 
-export const SITE = "https://talkhalifax.alexwmmolloy.workers.dev";
 export const KINDS = ["weather", "outages", "roads", "safety", "other"] as const;
 export type Kind = typeof KINDS[number];
 export const KIND_LABELS: Record<Kind, string> = {

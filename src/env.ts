@@ -38,6 +38,9 @@ export interface User {
   created_at: number;
 }
 
+/** The site's public address. Links in alerts and Telegram use it, and other addresses redirect to it. */
+export const SITE = "https://talkhalifax.ca";
+
 export const json = (data: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(data), {
     ...init,

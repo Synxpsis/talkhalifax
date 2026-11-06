@@ -70,6 +70,7 @@ jobs:
           B=https://talkhalifax.alexwmmolloy.workers.dev
           check() {
             curl -sf -m 20 "$B/" | grep -q TalkHalifax &&
+            curl -sf -m 20 "https://talkhalifax.ca/" | grep -q TalkHalifax &&
             curl -sf -m 20 "$B/api/stories" | grep -q '"stories"' &&
             curl -sf -m 20 "$B/api/alerts" | grep -q '"alerts"'
           }

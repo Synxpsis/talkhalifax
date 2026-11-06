@@ -1,11 +1,10 @@
 // Telegram approvals: new drafts go to the editor's Telegram chat with Approve / Discard buttons.
 // The bot's webhook (/telegram/webhook) handles the taps; the journalist waits on await_review meanwhile.
 // Secrets: TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_CHAT_ID (the editor's chat; the bot tells you it on /start).
-import { Env, json } from "./env";
+import { Env, SITE, json } from "./env";
 import { newsroomAuthorized, reviewDraft, reviewUpdate } from "./stories";
 import { KIND_LABELS, alertKind, countRecipients, pushOn, sendNotice } from "./push";
 
-const SITE = "https://talkhalifax.alexwmmolloy.workers.dev";
 const html = (s: unknown) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 
 /** New articles need the editor's approval once the bot is set up. */

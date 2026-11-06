@@ -38,7 +38,7 @@ Neither needs a Cloudflare account or touches the live site. CI runs both before
 
 ## Deploy
 
-Live at https://talkhalifax.alexwmmolloy.workers.dev, on the Cloudflare account pinned in `wrangler.jsonc`.
+Live at https://talkhalifax.ca, on the Cloudflare account pinned in `wrangler.jsonc`. `talkhalifax.com`, `talkhalifax.org` and the `www` names are custom domains on the same Worker and redirect there (set in the dashboard, under the Worker's Domains & Routes). The old `talkhalifax.alexwmmolloy.workers.dev` address redirects browsers, and stays on for the newsroom agents, the Telegram webhook and the Events job.
 
 **Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, unit tests, browser check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the checks and tests only. Changes only to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
 It needs one repository secret, `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Account › Workers Scripts › Edit** and **Account › D1 › Edit**.

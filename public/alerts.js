@@ -132,7 +132,7 @@
     .al-form { max-width: 560px; margin-top: 8px; }
     .al-lede { margin: 0 0 14px; max-width: 62ch; color: var(--ink-muted); font-size: 15px; line-height: 1.5; }
     .al-hint.al-foot { margin: 6px 0 0; max-width: 62ch; }
-    #alertsH { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--hdr, 64px) + 16px); }
+    #alertsH { margin-top: 32px; scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--hdr, 64px) + 16px); }
     .al-state { font-weight: 600; margin: 0 0 18px; }
     .al-form fieldset { border: 0; padding: 0; margin: 0 0 22px; }
     .al-form legend { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; padding: 0; }

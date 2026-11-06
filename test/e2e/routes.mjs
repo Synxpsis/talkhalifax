@@ -67,7 +67,11 @@ try {
       return p;
     };
     const view = p => p.evaluate(() => [...document.querySelectorAll("main > section.view")].filter(s => !s.hidden).map(s => s.id).join(","));
-    const heading = p => p.evaluate(() => document.querySelector("#article h1")?.innerText || "");
+    // A story loads from the API after the page does, so wait for it rather than guessing how long that takes
+    const heading = async (p, want) => {
+      if (want) await p.waitForFunction(t => document.querySelector("#article h1")?.innerText === t, { timeout: 10000 }, want).catch(() => {});
+      return p.evaluate(() => document.querySelector("#article h1")?.innerText || "");
+    };
 
     // Every page, by direct link
     for (const [hash, want] of [["home", "home"], ["articles", "articles"], ["notices", "notices"], ["events", "events"], ["transit", "transit"], ["profile", "profile"],
@@ -81,7 +85,8 @@ try {
     for (const s of STORIES) {
       // By direct link
       let p = await open(`article-${s.id}`);
-      ok(await view(p) === "article" && await heading(p) === s.headline, `${label}: a direct link opens the ${s.id} story`, await heading(p));
+      const direct = await heading(p, s.headline);
+      ok(await view(p) === "article" && direct === s.headline, `${label}: a direct link opens the ${s.id} story`, direct);
       await p.close();
 
       // By clicking its card, the way readers get there
@@ -93,7 +98,7 @@ try {
         await card.evaluate(c => c.scrollIntoView({ block: "center" }));
         await card.click();
         await wait(600);
-        ok(await view(p) === "article" && await heading(p) === s.headline, `${label}: clicking the ${s.id} card opens it`, await view(p));
+        ok(await heading(p, s.headline) === s.headline && await view(p) === "article", `${label}: clicking the ${s.id} card opens it`, await view(p));
         ok(await p.evaluate(id => location.hash === `#article-${id}`, s.id), `${label}: the address follows`);
         if (s.chat) ok(await p.$(".chat") !== null, `${label}: ${s.id} shows its live chat`);
       }
@@ -104,7 +109,7 @@ try {
     const p = await open("home");
     await p.evaluate(() => { location.hash = "#article-e2e-notice"; });
     await wait(500);
-    ok(await heading(p) === "A notice about a road", `${label}: changing the address opens a story in place`);
+    ok(await heading(p, "A notice about a road") === "A notice about a road", `${label}: changing the address opens a story in place`);
     await p.evaluate(() => { location.hash = "#articles"; });
     await wait(500);
     ok(await view(p) === "articles", `${label}: and goes back to a list`);
