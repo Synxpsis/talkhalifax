@@ -24,6 +24,9 @@ const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
 const SEED = STORIES.map(s => `INSERT INTO stories (id, kind, section, area, headline, dek, facts, body, means, source_url, published_at, updated_at, stage, developing_since)
   VALUES (${[s.id, s.kind, "City Hall", "Halifax", s.headline, "A dek", "[]", '["A sentence."]', "[]", "https://www.halifax.ca/", now, now, s.stage, now].map(q).join(", ")});`).join(" ");
 
+const WEATHER = JSON.stringify({ updatedAt: now, observedAt: now, station: "Test", condition: "Sunny", tempC: 15, feelsLikeC: 15, icon: "clear", night: false, url: "https://weather.gc.ca/" });
+const SEED_WEATHER = `INSERT INTO feeds (name, body, updated_at) VALUES ('weather', '${WEATHER}', '${now}');`;
+
 function browserPath() {
   const found = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/chromium-browser", "/usr/bin/chromium",
     "C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
@@ -39,7 +42,7 @@ const ok = (c, label, extra = "") => { console.log(`${c ? "PASS" : "FAIL"} ${lab
 
 rmSync(DATA, { recursive: true, force: true });
 npx([...WRANGLER, "d1", "migrations", "apply", "talkhalifax-test", "--local", "--persist-to", DATA]);
-writeFileSync(`${DATA}/seed.sql`, SEED);
+writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WEATHER}`);
 npx([...WRANGLER, "d1", "execute", "talkhalifax-test", "--local", "--persist-to", DATA, "--file", `${DATA}/seed.sql`]);
 
 const server = spawn("npx", [...WRANGLER, "dev", "--port", String(PORT), "--persist-to", DATA], { stdio: "ignore", shell: win, detached: !win, env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
@@ -101,6 +104,24 @@ try {
         ok(await heading(p, s.headline) === s.headline && await view(p) === "article", `${label}: clicking the ${s.id} card opens it`, await view(p));
         ok(await p.evaluate(id => location.hash === `#article-${id}`, s.id), `${label}: the address follows`);
         if (s.chat) ok(await p.$(".chat") !== null, `${label}: ${s.id} shows its live chat`);
+      }
+      await p.close();
+    }
+
+    // The weather: in the header on desktop, at the bottom of the menu on phones, and it never pushes the page sideways
+    {
+      const p = await open("home");
+      await p.waitForSelector("#hdrWx:not([hidden])", { timeout: 5000 }).catch(() => {});
+      const shown = await p.evaluate(() => { const r = document.getElementById("hdrWx").getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+      ok(shown === (width >= 761), `${label}: the header ${width >= 761 ? "shows" : "leaves out"} the weather`);
+      ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${label}: the header fits`);
+      if (width < 761) {
+        await p.click("#meBtn");
+        await wait(500);
+        const line = await p.evaluate(() => document.querySelector("#navDrawer .wx")?.innerText || "");
+        ok(line.includes("15°C"), `${label}: the menu shows the weather`, line);
+      } else {
+        ok((await p.evaluate(() => document.getElementById("hdrWx").innerText)).includes("Feels like 15°C"), `${label}: it reads as feels like`);
       }
       await p.close();
     }

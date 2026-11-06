@@ -36,7 +36,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 |---|---|---|---|---|---|
 | D1 | **`message_index` is never pruned.** It keeps a copy of every chat message forever, and room storage keeps the history of archived rooms. | It grows without limit, and the privacy page should say how long chat is kept | Decide a retention period (for example 12 months), delete older rows in the cron, and say so on `/#privacy` | Medium | S |
 | D2 | **No written restore plan.** D1 Time Travel can restore the last 30 days, but nobody has tried it, and Durable Object chat storage isn't covered. | A bad migration or a bulk delete could lose stories or chat | Write a short runbook (`wrangler d1 time-travel`), try it once against a copy, and add a weekly D1 export to R2 | Medium | M |
-| D5 | **Personal email addresses are still in git history.** The repo is public. `ADMIN_EMAILS` left the config on Nov. 6, but past commits still show it, and every commit's author email shows too. They aren't on the site. | Anyone can read them | Editor's decision: make the repo private, or rewrite history and use GitHub's no-reply address for commits | Medium | S |
+| D5 | **Personal email addresses are still in git history** (accepted for now). The repo is public. `ADMIN_EMAILS` left the config on Nov. 6, but past commits still show it, and every commit's author email shows too. They aren't on the site. | Anyone can read them | The editor chose on Nov. 6 to keep the repo public and leave history as it is. Going private would hide them; check the routines' GitHub access first | Low | S |
 
 ## Docs
 
@@ -46,6 +46,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 
 ## Paid off
 
+- **Nov. 6, 2026:** a smaller weather feed is back for the header line (current conditions only, no tides or forecasts), at the editor's request.
 - **Nov. 6, 2026:** Turnstile is on for sign-up, with tests for accepted, rejected, missing and unreachable checks (**D3**).
 - **Nov. 5, 2026:** the weather and tides feed and the unused road and Transit detour collection are removed (editor's decision). Weather warnings stay, and a failed refresh now reaches the cron's warning.
 - **Nov. 5, 2026:** first automated tests, run by CI before every deploy (**C1**, first slice; the rest stays open above).

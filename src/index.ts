@@ -4,6 +4,7 @@ import { deleteAccount, listReports, report, resolveReport, setBanned } from "./
 import { addComment, archiveStory, deleteComment, evaluateStages, listComments, listDrafts, newsroom, reopenStory, reviewDraft } from "./stories";
 import { mcp } from "./mcp";
 import { getAlerts, refreshAlerts } from "./alerts";
+import { getWeather, refreshWeather } from "./weather";
 import { telegramWebhook, tellEditor } from "./telegram";
 import { transit } from "./transit";
 import { checkEvents, events, ingestEvents } from "./events";
@@ -152,6 +153,7 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
     return token ? json({ url: `${url.origin}/#reset-${token}`, expiresIn: "1 hour" }) : json({ error: "Only accounts with a password can be reset." }, { status: 400 });
   }
 
+  if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
   if (path === "/api/alerts") return json({ alerts: await getAlerts(env, ctx) });
   if (path.startsWith("/api/transit/")) return transit(path);
   if (path === "/api/events") return events(env);
@@ -287,7 +289,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    const jobs = { alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "clean-up": tidyUp };
+    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "clean-up": tidyUp };
     const results = await Promise.allSettled(Object.values(jobs).map(job => job(env)));
     await watchCron(env, Object.keys(jobs).map((name, i) => [name, results[i]] as const));
   },

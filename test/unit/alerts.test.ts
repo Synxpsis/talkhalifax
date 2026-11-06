@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { getAlerts, refreshAlerts } from "../../src/alerts";
-import worker from "../../src/index";
 import { env } from "./helpers";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
@@ -37,12 +36,5 @@ describe("weather warnings", () => {
     stubEccc(() => new Response("down", { status: 503 }));
     await expect(refreshAlerts(env)).rejects.toThrow(/503/);
     expect((await getAlerts(env, ctx)).items).toHaveLength(2);
-  });
-});
-
-describe("the weather and tides feed", () => {
-  it("is gone", async () => {
-    const r = await worker.fetch(new Request("https://site.test/api/weather"), env, ctx);
-    expect(r.status).toBe(404);
   });
 });

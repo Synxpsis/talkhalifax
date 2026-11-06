@@ -428,6 +428,18 @@ img { max-width: 100%; }
 .hnav button[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
 .hnav button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 760px) { .hnav { display: none; } }
+/* Weather: a quiet line beside the sections on desktop, at the bottom of the menu on phones */
+.wx { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; color: var(--ink-muted); text-decoration: none; white-space: nowrap; }
+.wx[hidden] { display: none; }
+.wx:hover { color: var(--ink); }
+.wx svg { flex: none; color: var(--ink); }
+.wx:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-s); }
+header .wx { margin-left: auto; }
+header .wx:not([hidden]) + .hnav { margin-left: 0; }
+@media (max-width: 960px) { header .wx .wx-lbl { display: none; } }
+@media (max-width: 760px) { header .wx { display: none; } }
+.dr-wx { display: flex; margin-top: auto; padding-top: 24px; }
+.dr-wx + .dr-foot { margin-top: 0; padding-top: 6px; }
 .drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(320px, 86vw); max-width: none; height: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--edge-glass); background: var(--surface-solid); color: var(--ink); box-shadow: -12px 0 40px rgba(0, 0, 0, .14); }
 .drawer::backdrop { background: rgba(18, 20, 23, .34); }
 .dr-in { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top, 0px) + 10px) calc(env(safe-area-inset-right, 0px) + 16px) calc(env(safe-area-inset-bottom, 0px) + 18px) 18px; }
@@ -577,6 +589,7 @@ img { max-width: 100%; }
 <header>
   <div class="wrap">
     <button class="name" type="button" data-go="home" aria-label="TalkHalifax, home">Talk<span>Halifax</span></button>
+    <a class="wx" id="hdrWx" target="_blank" rel="noopener" hidden></a>
     <nav class="hnav" aria-label="Sections">
       <button type="button" data-go="home">Developing Stories</button>
       <button type="button" data-go="articles">Articles</button>

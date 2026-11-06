@@ -24,7 +24,7 @@
   // Workers AI screens chat messages and comments (Llama Guard) before they post.
   "ai": { "binding": "AI" },
 
-  // Weather warnings, the events check, story stages and clean-up every 30 minutes.
+  // Weather, weather warnings, the events check, story stages and clean-up every 30 minutes.
   "triggers": { "crons": ["*/30 * * * *"] },
 
   "vars": {

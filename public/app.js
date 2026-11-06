@@ -24,7 +24,7 @@
 
   // ---------- State ----------
   const S = {
-    me: null, providers: {}, stories: null, full: {}, alerts: null, offline: false,
+    me: null, providers: {}, stories: null, full: {}, weather: null, alerts: null, offline: false,
     sort: "active", current: "home", article: null, user: null, userFrom: null, users: {},
   };
   const reported = new Set(); // messages and comments this person has reported
@@ -994,6 +994,44 @@
   // ---------- Drawer (phones): the profile button opens the sections ----------
   const phone = () => window.matchMedia("(max-width: 760px)").matches;
   const drawer = $("#navDrawer");
+  // ---------- Weather: Environment Canada's current conditions, in the header and the phone menu ----------
+  const WX_MAX_AGE = 3 * 36e5; // an old reading is worse than none
+  const svg = (paths, fill) => `<svg width="24" height="24" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  const SUN_RAYS = '<path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>';
+  const CLOUD = '<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11.1 3.5 3.5 0 0 0 7 18z"/>';
+  const WX_ICONS = {
+    clear: svg(`<circle cx="12" cy="12" r="4.2" fill="currentColor"/>${SUN_RAYS}`),
+    moon: svg('<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>'),
+    partly: svg('<circle cx="8.5" cy="8" r="3" fill="currentColor"/><path d="M8.5 2.5v1.2M3 8h1.2M4.6 4.1l.9.9M12.4 4.1l-.9.9"/><path d="M9 20h8.5a3.5 3.5 0 0 0 .5-6.96A5 5 0 0 0 8.4 13.4 3.3 3.3 0 0 0 9 20z"/>'),
+    cloud: svg(CLOUD),
+    rain: svg('<path d="M7 14.5h10a3.8 3.8 0 0 0 .6-7.55A5.8 5.8 0 0 0 6.2 8 3.3 3.3 0 0 0 7 14.5z"/><path d="M8.5 18l-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5"/>'),
+    snow: svg('<path d="M7 14.5h10a3.8 3.8 0 0 0 .6-7.55A5.8 5.8 0 0 0 6.2 8 3.3 3.3 0 0 0 7 14.5z"/><path d="M8 18.5h.01M12 20.5h.01M16 18.5h.01M10 21.5h.01M14 17.5h.01"/>'),
+    storm: svg('<path d="M7 14h10a3.8 3.8 0 0 0 .6-7.55A5.8 5.8 0 0 0 6.2 7.5 3.3 3.3 0 0 0 7 14z"/><path d="M12.5 13.5L10 18h3.5L11.5 22"/>'),
+    fog: svg('<path d="M4 9h16M6.5 13h13M4 17h13"/>'),
+  };
+  /** The weather as link contents, or "" when there's no reading or it's too old to trust. */
+  function weatherLink() {
+    const w = S.weather;
+    if (!w || Date.now() - Date.parse(w.observedAt) > WX_MAX_AGE) return "";
+    const icon = w.night && w.icon === "clear" ? WX_ICONS.moon : WX_ICONS[w.icon] || WX_ICONS.cloud;
+    const about = `${w.condition ? w.condition + ", " : ""}${w.tempC}°C, feels like ${w.feelsLikeC}°C. Environment Canada, ${hm(w.observedAt)}`;
+    return `<a class="wx" href="${esc(w.url)}" target="_blank" rel="noopener" title="${esc(about)}" aria-label="${esc(about)}">${icon}<span><span class="wx-lbl">Feels like </span>${w.feelsLikeC}°C</span></a>`;
+  }
+  function renderHeaderWeather() {
+    const a = $("#hdrWx"), html = weatherLink();
+    if (!html) { a.hidden = true; return; }
+    const t = document.createElement("template");
+    t.innerHTML = html;
+    const link = t.content.firstElementChild;
+    for (const n of ["href", "title", "aria-label"]) a.setAttribute(n, link.getAttribute(n));
+    a.innerHTML = link.innerHTML;
+    a.hidden = false;
+  }
+  async function loadWeather() {
+    try { S.weather = (await getJSON("/api/weather")).weather; } catch (e) {}
+    renderHeaderWeather();
+  }
+
   function renderDrawer() {
     const live = (S.stories || []).filter(x => x.kind === "article" && x.stage === "developing").length;
     const urgent = allNotices().filter(n => !n.old && n.sev === "urgent").length;
@@ -1013,6 +1051,7 @@
         <button type="button" class="dr-link" data-go="events"${here("events")}>Events</button>
         <button type="button" class="dr-link" data-go="transit"${here("transit")}>Transit</button>
       </nav>
+      ${weatherLink() ? `<div class="dr-wx">${weatherLink()}</div>` : ""}
       <p class="dr-foot">Written by AI from official releases. <button type="button" class="by-link" data-go="privacy">Privacy</button></p>
     </div>`;
     $("#drClose").onclick = closeDrawer;
@@ -1265,8 +1304,8 @@
   });
 
   show(location.hash.slice(1) || "home");
-  Promise.all([loadMe(), loadStories(), loadAlerts()]);
+  Promise.all([loadMe(), loadStories(), loadAlerts(), loadWeather()]);
   // Home numbers ("2 here now", message counts) refresh while the page is visible
   setInterval(() => { if (!document.hidden && (S.current === "home" || S.current === "articles" || S.current === "notices")) loadStories(); }, 20000);
-  setInterval(() => { if (!document.hidden) loadAlerts(); }, 10 * 60000);
+  setInterval(() => { if (!document.hidden) { loadAlerts(); loadWeather(); } }, 10 * 60000);
 })();

@@ -24,7 +24,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 
 | Part | Where | What it does |
 |---|---|---|
-| Worker | `src/index.ts` | Routes, the 30-minute cron (weather warnings, a check that library events are arriving, story stages, clean-up) |
+| Worker | `src/index.ts` | Routes, the 30-minute cron (current weather, weather warnings, a check that library events are arriving, story stages, clean-up) |
 | Auth | `src/auth.ts` | Password and Google sign-in, sessions (HttpOnly cookie), Turnstile, reset links, rate limits |
 | Stories | `src/stories.ts` | Saving stories and versions, Developing → Articles, comments, approvals |
 | Chat rooms | `src/room.ts` | One Durable Object per story: history, presence, typing, screening, bans, removals |
@@ -32,6 +32,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 | Moderation | `src/moderation.ts` | Reports, bans, purges, account deletion |
 | Newsroom MCP | `src/mcp.ts` | The tools agents use (below) |
 | Telegram | `src/telegram.ts` | Drafts and held updates to the editor with buttons; plain notes |
+| Weather | `src/weather.ts` | Environment Canada's current conditions for the small line in the header and phone menu. Wind chill and humidex are used only when they apply at that temperature, because the feed can carry stale values |
 | Weather warnings | `src/alerts.ts` | Environment Canada warnings, watches and statements for the banners, Notices and `conditions` |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
@@ -70,7 +71,7 @@ P3 `decisions`, P4 `community`.
 | halifax.ca news releases | Articles and notices | `scan_sources`, `read_release` |
 | news.novascotia.ca | Provincial stories that touch Halifax | same |
 | rcmp.ca (Halifax-area detachments) | Police notices, always reviewed | same |
-| Environment Canada | Weather warnings (notices and banners) | `conditions`, cron |
+| Environment Canada | Weather warnings (notices and banners), current conditions (header and menu) | `conditions`, cron |
 | Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
 | Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
@@ -89,6 +90,7 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 
 ## Site features
 
+- **Weather**: icon and "Feels like" in the header on desktop (the temperature alone on narrow screens) and at the bottom of the phone menu, linking to Environment Canada. Hidden if the reading is over 3 hours old.
 - **Home**: developing stories as cards, latest first, with live people counts; urgent notices and weather warnings
   in banners under the header.
 - **Transit** (`#transit`, or `#transit-<route>`): a live map of every bus and ferry (MapLibre, OpenFreeMap tiles),
@@ -113,7 +115,7 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 ## Data (D1 tables)
 
 `users`, `sessions`, `auth_throttle` (rate limits, cleared after a day), `stories`, `story_versions`, `room_stats`,
-`message_index` (a copy of every chat message), `comments`, `feeds` (cached weather warnings and library events, plus the cron's failure counts), `leads`,
+`message_index` (a copy of every chat message), `comments`, `feeds` (cached weather, weather warnings and library events, plus the cron's failure counts), `leads`,
 `pending_updates`, `reports`, `password_resets`, `push_subs` (one row per browser with alerts on: its push address,
 keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and `push_count` record a sent alert. Live chat history itself lives in each room's Durable Object storage.
 
