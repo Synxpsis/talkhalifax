@@ -7,7 +7,7 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 - `public/`: the page (`index.html`, `app.js`), served as static assets
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather and weather warnings, story stages and clean-up
 - `src/alerts.ts`: Environment Canada weather warnings for the banners and Notices, shown as posted with links (not rewritten)
-- `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). When Halifax Transit publishes a new schedule, run `node scripts/build-transit.mjs` and push
+- `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). A GitHub Action (`.github/workflows/transit.yml`) rebuilds the map's data once Halifax Transit's new schedule starts, and deploys it
 - `src/events.ts` and `public/events.js`: the Events tab, from Halifax Public Libraries' events feed (the next two weeks). The feed refuses Cloudflare, so [.github/workflows/events.yml](.github/workflows/events.yml) runs `scripts/fetch-events.mjs` every 6 hours and posts it to the site
 - `src/push.ts`, `public/alerts.js` and `public/sw.js`: push alerts for urgent notices (sent only when the editor taps "Send alert" on Telegram), and the service worker that also keeps the app readable offline. `public/manifest.webmanifest` and `public/icons/` make it installable
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing

@@ -24,7 +24,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 
 | Part | Where | What it does |
 |---|---|---|
-| Worker | `src/index.ts` | Routes, the 30-minute cron (current weather, weather warnings, a check that library events are arriving, story stages, clean-up) |
+| Worker | `src/index.ts` | Routes, the 30-minute cron (current weather, weather warnings, a check on the Transit schedule's end date, a check that library events are arriving, story stages, clean-up) |
 | Auth | `src/auth.ts` | Password and Google sign-in, sessions (HttpOnly cookie), Turnstile, reset links, rate limits |
 | Stories | `src/stories.ts` | Saving stories and versions, Developing → Articles, comments, approvals |
 | Chat rooms | `src/room.ts` | One Durable Object per story: history, presence, typing, screening, bans, removals |
@@ -74,7 +74,7 @@ P3 `decisions`, P4 `community`.
 | Environment Canada | Weather warnings (notices and banners), current conditions (header and menu) | `conditions`, cron |
 | Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
-| Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
+| Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `.github/workflows/transit.yml` checks each Monday, rebuilds with `scripts/build-transit.mjs` once a new schedule has started, and deploys; the cron warns the editor in the schedule's last week |
 | Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | Fetched by the Events GitHub Action every 6 hours (about 16 requests) and posted to the Worker; the cron warns the editor when it's over 26 hours old |
 | Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
 | r/halifax | Signal: something may be happening | `trending` |

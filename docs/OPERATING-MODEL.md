@@ -61,6 +61,7 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
  19:00            Desk editor: evening briefing                          → note on Telegram
  Mondays 10:00    Source scout: proposals for new sources                → note on Telegram
  every 30 min     Worker cron: weather, weather warnings, events check, Developing → Articles, clean-up
+ Mondays 05:43    GitHub Action: rebuild the Transit map if a new schedule has started, then deploy
  every 6h (:37)   GitHub Action: fetch library events and post them to the site
 ```
 
@@ -72,7 +73,7 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
 | ✏️ Change to a published story | Journalist, standards editor (`update_story`) | Approve / Discard |
 | 📣 Send this notice as a push alert? (only when some readers have that kind of alert on) | The Worker, when a notice goes live | Send alert / No alert |
 | 🔢 Updated without approval (new numbers on a live weather or outage notice) | Journalist, standards editor (`update_story`) | No |
-| 🛠 Site cron failed twice in a row (weather, weather warnings, events, stages, clean-up), then recovered | The Worker | No |
+| 🛠 Site cron failed twice in a row (weather, weather warnings, events, Transit schedule, stages, clean-up), then recovered | The Worker | No |
 | 🚩 First report on a message or comment | Readers | No (review on the site) |
 | 👋 Journalist profile created | Journalist | No |
 | 🤖 Briefing, audit, health or scouting note | Desk, standards, reliability, scout (`notify_editor`) | No |

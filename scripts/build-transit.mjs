@@ -1,10 +1,11 @@
 // Builds the Transit map's fixed data from Halifax Transit's GTFS schedule (https://gtfs.halifax.ca/static/google_transit.zip).
-// Run it when Halifax Transit publishes a new schedule (a few times a year; the feed's end date is in the output):
-//   node scripts/build-transit.mjs
+// A GitHub Action runs it each week (.github/workflows/transit.yml). By hand:
+//   node scripts/build-transit.mjs            always rebuild
+//   node scripts/build-transit.mjs --if-new   rebuild only if a newer schedule has started
 // Writes:
 //   src/transit-data.json     for the Worker: routes, each trip's headsign and shape, stop names
 //   public/transit/shapes.json for the page: each route's lines, simplified and polyline-encoded
-import { writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { inflateRawSync } from "node:zlib";
 
 const URL_ = "https://gtfs.halifax.ca/static/google_transit.zip";
@@ -79,6 +80,18 @@ if (!res.ok) throw new Error(`${URL_}: ${res.status}`);
 const f = unzip(Buffer.from(await res.arrayBuffer()));
 const info = csv(f["feed_info.txt"] || "")[0] || {};
 const routes = csv(f["routes.txt"]), trips = csv(f["trips.txt"]), stops = csv(f["stops.txt"]);
+
+// Dates as Halifax sees them, YYYYMMDD like the feed's
+const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Halifax" }).replace(/-/g, "");
+if (process.argv.includes("--if-new")) {
+  const current = existsSync("src/transit-data.json") ? JSON.parse(readFileSync("src/transit-data.json", "utf8")).feedVersion : "";
+  if (info.feed_version === current) { console.log(`Halifax Transit ${current} is already in use. Nothing to do.`); process.exit(0); }
+  // Vehicles run the old schedule until the new one starts, so switching early would cost them their names and lines
+  if (info.feed_start_date > today) { console.log(`Halifax Transit ${info.feed_version} starts ${info.feed_start_date}. Waiting until then.`); process.exit(0); }
+}
+// A damaged download shouldn't replace good data
+if (routes.length < 20 || trips.length < 1000 || stops.length < 500) throw new Error(`The feed looks wrong: ${routes.length} routes, ${trips.length} trips, ${stops.length} stops.`);
+if (info.feed_end_date && info.feed_end_date < today) throw new Error(`The feed ended on ${info.feed_end_date}.`);
 
 const points = {};
 for (const s of csv(f["shapes.txt"])) (points[s.shape_id] ??= []).push([+s.shape_pt_sequence, +s.shape_pt_lat, +s.shape_pt_lon]);

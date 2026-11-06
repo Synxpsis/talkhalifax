@@ -114,6 +114,22 @@ function cached(name: keyof typeof FEEDS, build: () => Promise<unknown>) {
   return body;
 }
 
+/** Why the map's fixed data needs attention soon, or null. The schedule's end date is YYYYMMDD. */
+export function scheduleProblem(feedEnd: string, now = new Date()) {
+  const m = feedEnd.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!m) return "The Transit schedule has no end date. Check the Transit schedule workflow on GitHub (Actions tab).";
+  const end = `${m[1]}-${m[2]}-${m[3]}`, today = now.toLocaleDateString("en-CA", { timeZone: "America/Halifax" });
+  const days = Math.round((Date.parse(end) - Date.parse(today)) / 864e5);
+  if (days > 7) return null;
+  return `The Transit schedule ${days < 0 ? "ended" : "ends"} ${end}. After that, buses show without names or lines. If Halifax Transit has published a new one, run the Transit schedule workflow on GitHub (Actions tab).`;
+}
+
+/** The cron's job: fail, so the editor hears once, in the last week of the map's schedule. */
+export function checkTransitSchedule(now = new Date()) {
+  const problem = scheduleProblem(DATA.feedEnd, now);
+  if (problem) throw new Error(problem);
+}
+
 /** GET /api/transit/vehicles and /api/transit/alerts */
 export async function transit(path: string): Promise<Response> {
   const name = path === "/api/transit/vehicles" ? "vehicles" : path === "/api/transit/alerts" ? "alerts" : null;

@@ -59,7 +59,7 @@ features land on a codebase that can take them.
 **6c½. Transit map** (v1 shipped Nov. 4)
 - ✅ Live buses and ferries, route filter, route lines, service alerts per route.
 - v2: tap a stop for its next arrivals, and early/late on each bus, from the TripUpdates feed (1.4 MB; measure the
-  Worker's CPU time first). Rebuild the schedule data automatically (**N8**).
+  Worker's CPU time first). ✅ The schedule data rebuilds automatically (**N8**, Nov. 6).
 
 **6d. Polish**
 - Mobile: safe areas, chat keyboard handling, swipe back from a story, faster first load.

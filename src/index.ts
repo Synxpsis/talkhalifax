@@ -6,7 +6,7 @@ import { mcp } from "./mcp";
 import { getAlerts, refreshAlerts } from "./alerts";
 import { getWeather, refreshWeather } from "./weather";
 import { telegramWebhook, tellEditor } from "./telegram";
-import { transit } from "./transit";
+import { checkTransitSchedule, transit } from "./transit";
 import { checkEvents, events, ingestEvents } from "./events";
 import { pushApi } from "./push";
 export { ArticleRoom } from "./room";
@@ -289,7 +289,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "clean-up": tidyUp };
+    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "transit schedule": async () => checkTransitSchedule(), "clean-up": tidyUp };
     const results = await Promise.allSettled(Object.values(jobs).map(job => job(env)));
     await watchCron(env, Object.keys(jobs).map((name, i) => [name, results[i]] as const));
   },

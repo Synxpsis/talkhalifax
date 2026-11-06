@@ -17,7 +17,6 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 |---|---|---|---|---|---|
 | N5 | **r/halifax returns HTTP 429** to the Worker most of the time. | The Reddit signal is usually missing | Fetch it from the routine (not the Worker), or use Reddit's API with an app token. Or drop it, since it's only a signal | Low | M |
 | N6 | **Cron times are UTC.** Routines run an hour later in Halifax from November to March. | Briefings land at 7 a.m. in winter and 8 a.m. in summer | Change the crons twice a year (put a reminder in OPERATING-MODEL.md), or let the briefing say its own time | Low | S |
-| N8 | **The transit schedule data expires.** `src/transit-data.json` and `public/transit/shapes.json` come from the GTFS schedule valid until Nov. 29, 2026. After a new schedule, new trips have no headsign or line on the map (positions still show). | The map gets vaguer at each service change | Run `node scripts/build-transit.mjs` and push when Halifax Transit publishes; better, a weekly GitHub Action that rebuilds and opens a PR when it changes | Medium | M |
 | N7 | **The seed articles are out of date.** `scripts/articles/` holds 9 October stories for local runs. | Local testing doesn't look like the live site (no notices, RCMP or conditions stories) | Replace them with a handful of current stories of each kind, exported from the live site | Low | S |
 
 ## Code and tooling
@@ -46,6 +45,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 
 ## Paid off
 
+- **Nov. 6, 2026:** the Transit map's schedule data rebuilds itself each week once a new schedule starts, tested and deployed without a tap (editor's request), and the cron warns in the schedule's last week (**N8**).
 - **Nov. 6, 2026:** a smaller weather feed is back for the header line (current conditions only, no tides or forecasts), at the editor's request.
 - **Nov. 6, 2026:** Turnstile is on for sign-up, with tests for accepted, rejected, missing and unreachable checks (**D3**).
 - **Nov. 5, 2026:** the weather and tides feed and the unused road and Transit detour collection are removed (editor's decision). Weather warnings stay, and a failed refresh now reaches the cron's warning.
