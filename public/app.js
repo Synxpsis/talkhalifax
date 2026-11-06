@@ -885,8 +885,11 @@
           ${p.google ? `<a class="btn ghost" href="/auth/google?return=${encodeURIComponent("/#profile")}">Continue with Google</a>` : ""}
           ${p.dev ? `<form class="dev" id="devForm"><label class="sr" for="devName">Name</label><input id="devName" placeholder="Your name (local dev)" maxlength="40" required><button class="btn ghost" type="submit">Dev sign-in</button></form>` : ""}
         </div>` : ""}
+        <h2 class="p-h" id="alertsH">Alerts on this device</h2>
+        <div id="pAlerts"><p class="msg" style="border:0">Loading…</p></div>
         <p class="p-note">How TalkHalifax handles your account and messages: <a href="#privacy">Privacy</a>.</p>
       </div>`;
+      openAlerts();
       if (creating && p.turnstile) loadTurnstile().then(() => {
         if (!$("#tsBox")) return;
         tsToken = "";
@@ -933,6 +936,8 @@
       <h2 class="p-h">Settings</h2>
       <div class="setting"><span>Show the live chat when I open an article<small>On a phone it always starts tucked away at the bottom.</small></span>
         <button type="button" class="switch" id="chatPref" role="switch" aria-checked="${!chatHidden}" aria-label="Show the live chat when I open an article"></button></div>
+      <h2 class="p-h" id="alertsH">Alerts on this device</h2>
+      <div id="pAlerts"><p class="msg" style="border:0">Loading…</p></div>
       ${S.me.password ? `<details class="setting-more"><summary>Change password</summary>
         <form class="auth-form glass" id="pwForm" novalidate>
           <input type="text" name="username" autocomplete="username" value="${esc(S.me.name || "")}" hidden>
@@ -949,6 +954,7 @@
       <p class="p-note">TalkHalifax keeps your ${S.me.password ? "username, a scrambled (hashed) copy of your password" : "name, email and photo from Google"}, and what you post. <a href="#privacy">Privacy</a></p>
     </div>`;
     $("#pName").textContent = S.me.name || "You";
+    openAlerts();
     $("#chatPref").addEventListener("click", e => { setChatHidden(!chatHidden); e.currentTarget.setAttribute("aria-checked", String(!chatHidden)); });
     $("#signOut").addEventListener("click", async () => { await fetch("/auth/logout", { method: "POST" }); location.href = "/"; });
     let delArmed = false;
@@ -1006,7 +1012,6 @@
         <button type="button" class="dr-link" data-go="notices"${here("notices")}>Notices${urgent ? `<span class="n">${urgent} URGENT</span>` : ""}</button>
         <button type="button" class="dr-link" data-go="events"${here("events")}>Events</button>
         <button type="button" class="dr-link" data-go="transit"${here("transit")}>Transit</button>
-        <button type="button" class="dr-link" data-go="alerts"${here("alerts")}>Alerts</button>
       </nav>
       <p class="dr-foot">Written by AI from official releases. <button type="button" class="by-link" data-go="privacy">Privacy</button></p>
     </div>`;
@@ -1033,7 +1038,7 @@
   $("#meBtn").addEventListener("click", () => phone() ? openDrawer() : goTo("profile"));
 
   // ---------- Navigation: Developing Stories (home), Articles, a profile, or one article room ----------
-  const VIEWS = ["home", "articles", "notices", "events", "transit", "alerts", "profile", "privacy"];
+  const VIEWS = ["home", "articles", "notices", "events", "transit", "profile", "privacy"];
   function show(v) {
     if (v.startsWith("article-")) { S.article = v.slice(8); v = "article"; }
     else if (v.startsWith("user-")) {
@@ -1043,6 +1048,9 @@
     }
     else if (v.startsWith("reset-")) { S.resetToken = v.slice(6); v = "reset"; }
     else if (v.startsWith("transit")) { S.transitRoute = decodeURIComponent(v.slice(8)); v = "transit"; }
+    // Alerts are a section of the profile, so old #alerts links land there
+    const toAlerts = v === "alerts";
+    if (toAlerts) v = "profile";
     else if (!VIEWS.includes(v)) v = "home";
     if (v !== "article") { S.article = null; chatOpen = false; leaveRoom(); }
     if (v !== "transit") window.THTransit?.close();
@@ -1054,8 +1062,10 @@
     if (v === "profile") $("#meBtn").setAttribute("aria-current", "page"); else $("#meBtn").removeAttribute("aria-current");
     document.querySelectorAll(".hnav [data-go]").forEach(b => { if (b.dataset.go === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     try { history.replaceState(null, "", "#" + hashOf(v)); } catch (e) {}
-    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "transit") openTransit(); else if (v === "events") openEvents(); else if (v === "alerts") openAlerts(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
+    if (v === "article") renderArticle(); else if (v === "user") renderUser(); else if (v === "reset") renderReset(); else if (v === "privacy") {} else if (v === "transit") openTransit(); else if (v === "events") openEvents(); else if (v === "profile") renderProfile(); else if (v === "articles") renderArticles(); else if (v === "notices") renderNotices(); else renderHome();
     applyChatState();
+    // The profile can redraw once sign-in state loads, so keep landing on Alerts for a moment after the request
+    if (toAlerts) { alertsScrollUntil = Date.now() + 2500; setTimeout(scrollToAlerts, 60); }
   }
   // The Transit map lives in its own script (and MapLibre), loaded the first time someone opens it
   let transitScript;
@@ -1074,9 +1084,15 @@
     lazy("/events.js").then(() => { if (S.current === "events") window.THEvents.open($("#events")); })
       .catch(() => { $("#events").innerHTML = `<div class="msg">The events list couldn't load. Check your connection and try again.</div>`; });
   }
+  /** The Alerts section of the profile (signed in or not: alerts belong to the device, not an account). */
+  let alertsScrollUntil = 0;
+  function scrollToAlerts() { const a = $("#alertsH"); if (a && Date.now() < alertsScrollUntil) a.scrollIntoView({ block: "start" }); }
   function openAlerts() {
-    lazy("/alerts.js").then(() => { if (S.current === "alerts") window.THAlerts.open($("#alerts")); })
-      .catch(() => { $("#alerts").innerHTML = `<div class="msg">The alerts page couldn't load. Check your connection and try again.</div>`; });
+    const el = $("#pAlerts");
+    if (!el) return;
+    scrollToAlerts();
+    lazy("/alerts.js").then(async () => { if (S.current === "profile" && el.isConnected) { await window.THAlerts.open(el, { embedded: true }); scrollToAlerts(); } })
+      .catch(() => { el.innerHTML = `<div class="msg">Alerts couldn't load. Check your connection and try again.</div>`; });
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };
   const hashOf = v => v === "article" ? "article-" + S.article : v === "user" ? "user-" + S.user : v === "reset" ? "reset-" + S.resetToken : v === "transit" && S.transitRoute ? "transit-" + encodeURIComponent(S.transitRoute) : v;
@@ -1207,16 +1223,45 @@
 
   // ---------- Footer ----------
   document.getElementById("sfYear").textContent = new Date().getFullYear();
-  // "Install the app" shows only where the browser offers its own install prompt (Chrome, Edge, Android)
+  // "Install the app": the browser's own install prompt where it offers one (Chrome, Edge, Android once it's ready);
+  // on iPhone, iPad and Android otherwise, a card with the steps. Hidden when it's already open as an installed app.
   let installPrompt = null;
-  const sfInstall = document.getElementById("sfInstall");
-  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; sfInstall.hidden = false; });
-  window.addEventListener("appinstalled", () => { installPrompt = null; sfInstall.hidden = true; });
+  const sfInstall = document.getElementById("sfInstall"), installCard = document.getElementById("installCard");
+  const installed = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  const showInstall = () => { sfInstall.hidden = installed() || !(installPrompt || isIOS || isAndroid); };
+  showInstall();
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; showInstall(); });
+  window.addEventListener("appinstalled", () => { installPrompt = null; sfInstall.hidden = true; if (installCard.open) installCard.close(); });
+  const SHARE_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10H6.5A1.5 1.5 0 0 0 5 11.5v8A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-8a1.5 1.5 0 0 0-1.5-1.5H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const MENU_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>`;
+  function openInstallCard() {
+    const otherIOSBrowser = /CriOS|FxiOS|EdgiOS/.test(navigator.userAgent), iPad = isIOS && !/iPhone|iPod/.test(navigator.userAgent);
+    const steps = isIOS ? [
+      `Tap the Share button <span class="ico">${SHARE_ICON}</span> ${otherIOSBrowser ? "in the address bar" : iPad ? "at the top of Safari" : "at the bottom of Safari"}.`,
+      "Scroll down and tap <b>Add to Home Screen</b>.",
+      "Tap <b>Add</b>. TalkHalifax is now on your Home Screen; open it from there.",
+    ] : [
+      `Tap the menu <span class="ico">${MENU_ICON}</span> at the top right of your browser.`,
+      "Tap <b>Add to Home screen</b> or <b>Install app</b>.",
+      "Tap <b>Install</b> or <b>Add</b>. TalkHalifax is now with your apps.",
+    ];
+    installCard.innerHTML = `<div class="ins-in">
+      <div class="ins-head"><img src="/icons/icon-192.png" alt=""><h2 id="insTitle">Install TalkHalifax</h2>
+        <button type="button" class="ins-x" id="insClose" aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>
+      <ol>${steps.map(t => `<li><span>${t}</span></li>`).join("")}</ol>
+      <p class="ins-note">It opens full screen like an app, keeps the stories you've read for when you're offline, and can get alerts for urgent notices.</p>
+    </div>`;
+    installCard.querySelector("#insClose").onclick = () => installCard.close();
+    installCard.showModal();
+  }
+  installCard.addEventListener("click", e => { if (e.target === installCard) installCard.close(); }); // tap outside closes
   document.getElementById("sfInstallBtn").addEventListener("click", async () => {
-    if (!installPrompt) return;
+    if (!installPrompt) return openInstallCard();
     installPrompt.prompt();
     await installPrompt.userChoice.catch(() => {});
-    installPrompt = null; sfInstall.hidden = true;
+    installPrompt = null; showInstall();
   });
 
   show(location.hash.slice(1) || "home");

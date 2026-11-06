@@ -34,7 +34,7 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
 | Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, every 6 hours) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
-| Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in on `/#alerts` (kinds, quiet hours). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
+| Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in from the Alerts section of their profile, no account needed (kinds, quiet hours; `/#alerts` links land there). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
 | Schema | `migrations/0001`–`0010` | D1 tables (below) |
@@ -96,9 +96,10 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 - **Articles** and **Notices**: archived articles and current notices.
 - **Events** (`#events`): what's on at the libraries over the next two weeks, filtered by when, who it's for and area,
   with Highlights from the library's featured events, special events and performances.
-- **Alerts** (`#alerts`): turn push alerts on for urgent notices, pick kinds (weather, outages, roads and transit,
+- **Alerts**, a section of the profile (old `#alerts` links scroll to it; no account needed): turn push alerts on for urgent notices, pick kinds (weather, outages, roads and transit,
   police and emergencies, other) and quiet hours. Offered under a notice, never on a first visit.
-- **Installable and offline**: Add to Home Screen on phones, install on desktop. Without a connection the app opens,
+- **Installable and offline**: Add to Home Screen on phones, install on desktop. The footer's Install the app opens the
+  browser's own prompt, or on iPhone and Android a card with the steps. Without a connection the app opens,
   shows an offline bar, and stories you've opened and the events list stay readable; chat waits for the connection.
 - **Story**: the article or notice, its facts, version notes, the docked live chat (or comments once archived).
 - **Chat**: live messages, typing, presence, report (⚑), screening with the text handed back if turned away.

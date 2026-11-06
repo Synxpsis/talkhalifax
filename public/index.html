@@ -342,6 +342,22 @@ body.chat-open .site-foot .wrap { padding-right: calc(var(--chatw) + max(28px, e
   body.chat-open .site-foot .wrap { padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   body.wide-view .site-foot .wrap { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 }
+/* Install the app: the browser's own prompt where there is one, otherwise these steps */
+.install { width: min(420px, calc(100vw - 32px)); max-width: none; margin: auto; padding: 0; border: 1px solid var(--edge-glass); border-radius: var(--radius-l); background: var(--surface-solid); color: var(--ink); box-shadow: 0 18px 50px rgba(0, 0, 0, .18); }
+.install::backdrop { background: rgba(18, 20, 23, .34); }
+.ins-in { padding: 22px 22px 20px; }
+.ins-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ins-head img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+.ins-head h2 { margin: 0; font-family: var(--f-display); font-size: 20px; letter-spacing: -.01em; line-height: 1.2; flex: 1; }
+.ins-x { all: unset; box-sizing: border-box; cursor: pointer; width: 44px; height: 44px; margin: -8px -10px 0 0; display: grid; place-items: center; border-radius: var(--radius-s); color: var(--ink-muted); flex: none; }
+.ins-x:hover { background: var(--surface-sunken); color: var(--ink); }
+.ins-x:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.install ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+.install li { counter-increment: s; display: flex; gap: 12px; align-items: flex-start; font-size: 15.5px; line-height: 1.45; }
+.install li::before { content: counter(s); flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-sunken); font-size: 13px; font-weight: 700; }
+.install .ico { display: inline-grid; place-items: center; width: 26px; height: 26px; vertical-align: -7px; margin: 0 2px; border-radius: 6px; background: var(--surface-sunken); color: var(--signal-ok); }
+.install .ins-note { margin: 16px 0 0; font-size: 13.5px; color: var(--ink-muted); line-height: 1.45; }
+@media (prefers-reduced-motion: no-preference) { .install[open] { animation: ins-in .22s cubic-bezier(.2, .7, .2, 1); } @keyframes ins-in { from { opacity: 0; transform: translateY(12px) scale(.98); } } }
 @media (max-width: 860px) { .sf-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sf-brand { grid-column: 1 / -1; } }
 @media (max-width: 560px) { .site-foot .wrap { padding-top: 32px; } .sf-top { gap: 28px 20px; } .sf-sources { grid-column: 1 / -1; } .sf-fine { margin-top: 28px; } }
 
@@ -387,7 +403,8 @@ body.chat-open .site-foot .wrap { padding-right: calc(var(--chatw) + max(28px, e
 </style>
 <style>
 html { -webkit-text-size-adjust: 100%; touch-action: manipulation; } /* no double-tap zoom */
-body { margin: 0; }
+body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; }
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
@@ -585,7 +602,6 @@ img { max-width: 100%; }
 
   <section class="view wrap" id="transit" hidden></section>
 
-  <section class="view wrap" id="alerts" hidden></section>
 
   <section class="view wrap" id="articles" hidden>
     <div class="forum-top">
@@ -651,7 +667,7 @@ img { max-width: 100%; }
     <ul>
       <li>Delete any of your messages or comments yourself, at any time.</li>
       <li>Change your password from your profile. If you're locked out, a moderator can send you a one-time reset link.</li>
-      <li>Turn alerts off on the Alerts page and your alert address is deleted at once. Blocking notifications in your browser stops them too; the address is deleted the next time an alert can't be delivered.</li>
+      <li>Turn alerts off in the Alerts section of your profile (no account needed) and your alert address is deleted at once. Blocking notifications in your browser stops them too; the address is deleted the next time an alert can't be delivered.</li>
       <li>Delete your account from your profile. Your messages and comments are erased, your account is emptied, and you're signed out everywhere.</li>
     </ul>
     <p class="forum-foot">Last updated November 5, 2026.</p>
@@ -660,6 +676,7 @@ img { max-width: 100%; }
 </main>
 
 <dialog class="drawer" id="navDrawer" aria-label="Menu" tabindex="-1"></dialog>
+<dialog class="install" id="installCard" aria-labelledby="insTitle"></dialog>
 
 <footer class="site-foot">
   <div class="wrap">
