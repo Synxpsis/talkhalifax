@@ -17,7 +17,7 @@ standards-keeper, docs-keeper).
 ## Rules
 
 - **Every push to `main` deploys** (type check, tests, D1 migrations, `wrangler deploy`). Commit or push only when the editor
-  asks. Only `prototype/**` and `README.md` changes skip the deploy.
+  asks. Only `README.md` changes skip the deploy.
 - **Secrets never pass through an agent.** The editor sets them with `npx wrangler secret put <NAME>`. Don't read,
   print or write tokens, and don't put personal email addresses on the site.
 - **Facts come only from the official source.** Searches, Reddit, chat and other outlets are signals, never facts,
@@ -30,8 +30,7 @@ standards-keeper, docs-keeper).
 ## Line endings
 
 Every file is LF, enforced by `.gitattributes` (`* text=auto eol=lf`). Python on Windows writes CRLF in text mode
-unless you pass `newline='
-'`; git converts it back on commit, but the working copy shows a whole-file diff until then.
+unless you pass `newline='\n'`; git converts it back on commit, but the working copy shows a whole-file diff until then.
 
 ## Local quirks
 

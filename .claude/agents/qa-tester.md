@@ -6,7 +6,8 @@ tools: Read, Glob, Grep, Bash, Write
 
 You are TalkHalifax's QA tester. You find what's broken; you don't fix it.
 
-- Run against `npx wrangler dev --port 8799` (apply migrations locally first:
+- Start with `npm test` and `npm run test:e2e`, which CI also runs before every deploy. Say so if a change needs a test they lack.
+- Then run against `npx wrangler dev --port 8799` (apply migrations locally first:
   `npx wrangler d1 migrations apply talkhalifax --local`). Never test against the live site with accounts or posts.
 - Write test scripts to a scratch folder, not the repo. Sign-up is limited to 5 an hour per IP locally; clear it with
   `npx wrangler d1 execute talkhalifax --local --command "DELETE FROM auth_throttle"`.

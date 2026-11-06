@@ -44,7 +44,7 @@ features land on a codebase that can take them.
 - "Add to Home Screen" works on iOS and Android, and desktop install works in Chrome and Edge. Checked in Edge;
   still to try on a real iPhone and Android phone.
 
-**6c. Push alerts for P0** (built Nov. 5; on once the editor sets the VAPID keys)
+**6c. Push alerts for P0** (built and switched on Nov. 5)
 - ✅ Web Push (VAPID keys as Worker secrets) for urgent notices. Opt-in only, offered after a reader opens a notice,
   never on first visit.
 - ✅ A preference for which kinds of alert, and quiet hours.

@@ -1,5 +1,5 @@
 # Deploys TalkHalifax to Cloudflare on every push to main (and on demand).
-# Pull requests only get the type check.
+# Pull requests get the checks and tests only; a failure in either stops the deploy.
 #
 # Needs one repository secret: CLOUDFLARE_API_TOKEN, a Cloudflare API token with
 #   Account › Workers Scripts › Edit   and   Account › D1 › Edit
@@ -9,9 +9,9 @@ name: Deploy
 on:
   push:
     branches: [main]
-    paths-ignore: ["prototype/**", "README.md"]
+    paths-ignore: ["README.md"]
   pull_request:
-    paths-ignore: ["prototype/**", "README.md"]
+    paths-ignore: ["README.md"]
   workflow_dispatch:
 
 # One deploy at a time; a newer push waits for the running one instead of cancelling it mid-migration
@@ -26,8 +26,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -53,8 +53,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       WRANGLER_SEND_METRICS: "false"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

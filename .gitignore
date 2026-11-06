@@ -4,5 +4,4 @@ node_modules/
 scripts/seed.sql
 .env
 .newsroom-token
-prototype/feeds/
-prototype/.preview/
+prototype/

@@ -1091,7 +1091,7 @@
     const el = $("#pAlerts");
     if (!el) return;
     scrollToAlerts();
-    lazy("/alerts.js").then(async () => { if (S.current === "profile" && el.isConnected) { await window.THAlerts.open(el, { embedded: true }); scrollToAlerts(); } })
+    lazy("/alerts.js").then(async () => { if (S.current === "profile" && el.isConnected) { await window.THAlerts.open(el); scrollToAlerts(); } })
       .catch(() => { el.innerHTML = `<div class="msg">Alerts couldn't load. Check your connection and try again.</div>`; });
   }
   const goTo = v => { closeDrawer(); show(v); window.scrollTo({ top: 0 }); };

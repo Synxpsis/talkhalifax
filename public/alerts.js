@@ -11,7 +11,7 @@
   const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const hourLabel = m => { const h = Math.floor(m / 60); return h === 0 ? "midnight" : h === 12 ? "noon" : `${h % 12} ${h < 12 ? "a.m." : "p.m."}`; };
 
-  let root, embedded = false, info = null, reg = null, noWorker = false, sub = null, saved = null, busy = false, note = "", err = "";
+  let root, info = null, reg = null, noWorker = false, sub = null, saved = null, busy = false, note = "", err = "";
 
   /** The service worker that receives alerts, or null if this browser won't run one (within 5 seconds). */
   async function worker() {
@@ -50,9 +50,7 @@
     const hours = [...Array(24)].map((_, h) => h * 60);
     const sel = (id, v) => `<select id="${id}">${hours.map(m => `<option value="${m}"${m === v ? " selected" : ""}>${hourLabel(m)}</option>`).join("")}</select>`;
     const lede = "Get an alert on this device when there's an urgent notice: a weather warning, a big power outage, a road closure, a police or fire emergency. A person on our team decides which notices are urgent enough to send. Nothing else is sent. No account needed.";
-    root.innerHTML = `${embedded ? `<p class="al-lede">${lede}</p>` : `<button type="button" class="back" data-go="notices">← Notices</button>
-      <div class="forum-top"><h1>Alerts</h1></div>
-      <p class="forum-lede">${lede}</p>`}
+    root.innerHTML = `<p class="al-lede">${lede}</p>
       ${why ? `<div class="msg">${esc(why)}</div>` : `
       <form class="al-form" id="alForm">
         <p class="al-state">${on ? "✓ Alerts are on for this device." : "Alerts are off for this device."}</p>
@@ -70,7 +68,7 @@
           ${on ? `<button type="button" class="btn ghost" id="alOff"${busy ? " disabled" : ""}>Turn off alerts</button>` : ""}
         </div>
       </form>`}
-      <p class="${embedded ? "al-hint al-foot" : "forum-foot"}">For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>. To get alerts we keep this browser's alert address and your choices, and nothing that identifies you. Turning alerts off deletes them. <a href="#privacy" data-go="privacy">Privacy</a></p>`;
+      <p class="al-hint al-foot">For emergencies, follow official channels and sign up for hfxALERT at <a href="https://halifax.ca/hfxalert" target="_blank" rel="noopener">halifax.ca/hfxalert</a>. To get alerts we keep this browser's alert address and your choices, and nothing that identifies you. Turning alerts off deletes them. <a href="#privacy" data-go="privacy">Privacy</a></p>`;
   }
 
   function choices() {
@@ -113,9 +111,7 @@
   }
 
   window.THAlerts = {
-    /** Render into el; { embedded: true } leaves out the page title and back button (inside the profile). */
-    async open(el, opts = {}) {
-      embedded = !!opts.embedded;
+    async open(el) {
       if (root !== el) { root = el; wire(el); }
       note = ""; err = "";
       render();

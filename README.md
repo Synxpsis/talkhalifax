@@ -6,7 +6,7 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 
 - `public/`: the page (`index.html`, `app.js`), served as static assets
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather, tides and alerts
-- `src/alerts.ts`: the home page's Getting around list: halifax.ca road notices and Windsor Street Exchange work, Halifax Transit detours, and Environment Canada weather warnings, shown as posted with links (not rewritten)
+- `src/alerts.ts`: collects halifax.ca road notices, Windsor Street Exchange work, Halifax Transit detours and Environment Canada weather warnings. Only the weather warnings are shown today, in the banners and on Notices
 - `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). When Halifax Transit publishes a new schedule, run `node scripts/build-transit.mjs` and push
 - `src/events.ts` and `public/events.js`: the Events tab, from Halifax Public Libraries' events feed (the next two weeks). The feed refuses Cloudflare, so [.github/workflows/events.yml](.github/workflows/events.yml) runs `scripts/fetch-events.mjs` every 6 hours and posts it to the site
 - `src/push.ts`, `public/alerts.js` and `public/sw.js`: push alerts for urgent notices (sent only when the editor taps "Send alert" on Telegram), and the service worker that also keeps the app readable offline. `public/manifest.webmanifest` and `public/icons/` make it installable
@@ -40,7 +40,7 @@ Neither needs a Cloudflare account or touches the live site. CI runs both before
 
 Live at https://talkhalifax.alexwmmolloy.workers.dev, on the Cloudflare account pinned in `wrangler.jsonc`.
 
-**Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, unit tests, browser check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the checks and tests only. Changes only under `prototype/` or to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
+**Automatically:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml): type check, unit tests, browser check, apply any new D1 migrations, `wrangler deploy`. Pull requests get the checks and tests only. Changes only to this README don't deploy. You can also run it by hand from the repo's **Actions** tab.
 It needs one repository secret, `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Account › Workers Scripts › Edit** and **Account › D1 › Edit**.
 
 **By hand:** `npm run db:migrate:remote`, then `npm run deploy`.

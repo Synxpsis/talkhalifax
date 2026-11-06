@@ -48,11 +48,11 @@ has nothing new, the right output is nothing.
 |---|---|---|
 | 1 | Site, live chat per story, sign-in, weather, tides and Getting around | Done |
 | 2 | Newsroom MCP, leads queue, hourly journalist, check-ins | Done |
-| 3 | Telegram approvals, provincial and RCMP releases, live conditions, search and Reddit signals, profiles | Done (library events left) |
+| 3 | Telegram approvals, provincial and RCMP releases, live conditions, search and Reddit signals, profiles | Done |
 | 4 | Hardening: screening, reports, bans, resets, privacy page, Turnstile | Done (Turnstile keys pending) |
-| 5 | **Operating model**: a team of agents with set jobs, briefings and audits on Telegram, documented | In progress |
-| 6 | **Native experience**: installable app (PWA), offline reading, push alerts for P0 notices, mobile and desktop polish | Next |
-| 7 | More sources: Halifax Water, Halifax Transit service alerts, Nova Scotia Health, library and community events | Next |
+| 5 | **Operating model**: a team of agents with set jobs, briefings and audits on Telegram, documented | Done (exit test being watched) |
+| 6 | **Native experience**: installable app (PWA), offline reading, push alerts for P0 notices, mobile and desktop polish | In progress (installable, offline, push and Events are live) |
+| 7 | More sources: Halifax Water, Halifax Transit service alerts, Nova Scotia Health, more event calendars | Next |
 | 8 | Off-site reach: social posts for P0 notices and the day's top stories, then a daily digest | Later |
 
 The detailed plan, with what each phase must prove before the next, is in [ROADMAP.md](ROADMAP.md).

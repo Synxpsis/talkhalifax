@@ -114,7 +114,5 @@ be shared here, to keep people safe." No exclamation marks, no "Oops", no em das
 
 ## Next for the native experience
 
-- A web app manifest, icons and a service worker, so the site installs and opens offline to the last stories read.
-- Push notifications for P0 notices (opt-in, per topic).
-- Choose the `--splash` brand colour and an app icon.
+- Choose the `--splash` brand colour.
 - A small component page (`/#styleguide`, moderators only) that renders every component in both themes, for review.
