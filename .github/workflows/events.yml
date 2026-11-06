@@ -1,0 +1,31 @@
+# Loads Halifax Public Libraries' events into the Events tab. The library's public feed refuses requests from
+# Cloudflare, so GitHub fetches it and posts the pages to the site (scripts/fetch-events.mjs).
+#
+# Needs one repository secret: EVENTS_TOKEN (set it, and the matching Worker secret, with node scripts/events-token.mjs)
+name: Events
+
+on:
+  schedule:
+    - cron: "20 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: events
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  events:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch and post library events
+        run: node scripts/fetch-events.mjs
+        env:
+          EVENTS_TOKEN: ${{ secrets.EVENTS_TOKEN }}

@@ -1,10 +1,11 @@
 // What's on in Halifax, for the Events tab. The source is Halifax Public Libraries' public events feed (BiblioCommons
 // RSS, which takes a date range). Events are shown as the library lists them, never rewritten, each linking back.
-// The cron stores the next two weeks in feeds ('events'); /api/events reads that.
+// The feed refuses requests from Cloudflare, so a GitHub Action (scripts/fetch-events.mjs, every 6 hours) fetches the
+// next two weeks and posts the raw pages to /api/events/ingest. They're parsed here and stored in feeds ('events');
+// /api/events reads that.
 import { Env, json } from "./env";
 
-const FEED = "https://gateway.bibliocommons.com/v2/libraries/halifax/rss/events";
-const DAYS = 14, MAX_PAGES = 40, STALE_MS = 3 * 36e5;
+const MAX_PAGES = 40, MAX_PAGE_BYTES = 1_000_000, STALE_MS = 26 * 36e5;
 const AUDIENCES = ["Preschoolers", "Kids", "Teens", "Adults", "All Ages"];
 const LANGUAGES = /^(English|French|Arabic|Spanish|Mandarin|Cantonese|Persian|Farsi|Ukrainian|Hindi|Punjabi|Tagalog|Korean|Portuguese|ASL|Mi'kmaw|Gaelic)$/i;
 // The library's stock banner for each event type isn't a picture of the event, so it doesn't count as an image
@@ -57,48 +58,46 @@ function parseItem(item: string): LibraryEvent | null {
   };
 }
 
-/** Halifax's local date, YYYY-MM-DD, n days from now. */
-const localDay = (n = 0) => new Date(Date.now() + n * 864e5).toLocaleDateString("en-CA", { timeZone: "America/Halifax" });
-
-export async function fetchEvents() {
-  const from = localDay(), to = localDay(DAYS);
+/** The events in the feed's RSS pages, de-duplicated, without any that have ended. */
+function parsePages(pages: string[], from: string, to: string) {
   const seen = new Map<string, LibraryEvent>();
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const r = await fetch(`${FEED}?startDate=${from}&endDate=${to}&page=${page}`, { headers: { "user-agent": "TalkHalifax (Cloudflare Worker)" } });
-    if (!r.ok) throw new Error(`Library events: HTTP ${r.status} ${(await r.text()).slice(0, 200).replace(/\s+/g, " ")}`);
-    const items = (await r.text()).split("<item>").slice(1);
-    let fresh = 0;
-    for (const it of items) { const e = parseItem(it); if (e && !seen.has(e.id + e.start)) { seen.set(e.id + e.start, e); fresh++; } }
-    if (!items.length || !fresh) break;
+  for (const page of pages) for (const it of page.split("<item>").slice(1)) {
+    const e = parseItem(it);
+    if (e && !seen.has(e.id + e.start)) seen.set(e.id + e.start, e);
   }
   const events = [...seen.values()].filter(e => Date.parse(e.end || e.start) > Date.now()).sort((a, b) => a.start.localeCompare(b.start));
   return { updatedAt: new Date().toISOString(), source: "Halifax Public Libraries", sourceUrl: "https://halifax.bibliocommons.com/v2/events", from, to, events };
 }
+type EventsBody = ReturnType<typeof parsePages>;
 
-export async function refreshEvents(env: Env) {
-  const body = await fetchEvents();
-  if (!body.events.length) throw new Error("Library events: the feed returned no events");
+/** POST /api/events/ingest (Bearer EVENTS_TOKEN): { from, to, pages: [rss, ...] } from the GitHub Action. */
+export async function ingestEvents(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
+  if (!env.EVENTS_TOKEN || req.headers.get("authorization") !== `Bearer ${env.EVENTS_TOKEN}`) return json({ error: "Unauthorized" }, { status: 401 });
+  const b = await req.json().catch(() => null) as { from?: unknown; to?: unknown; pages?: unknown } | null;
+  const day = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!b || !day(b.from) || !day(b.to) || !Array.isArray(b.pages) || !b.pages.length || b.pages.length > MAX_PAGES
+    || !b.pages.every(p => typeof p === "string" && p.length <= MAX_PAGE_BYTES)) return json({ error: "Bad request" }, { status: 400 });
+  const body = parsePages(b.pages as string[], b.from as string, b.to as string);
+  // An empty or broken fetch keeps the last good list rather than wiping the tab
+  if (!body.events.length) return json({ error: "No events in those pages; the stored list is unchanged." }, { status: 422 });
   await env.DB.prepare(
     "INSERT INTO feeds (name, body, updated_at) VALUES ('events', ?, ?) ON CONFLICT(name) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at",
   ).bind(JSON.stringify(body), body.updatedAt).run();
-  return body;
+  return json({ events: body.events.length, from: body.from, to: body.to });
 }
 
-/** GET /api/events: the stored list without events that have ended; refreshed in the background when it's old. */
-export async function events(env: Env, ctx: ExecutionContext): Promise<Response> {
-  const row = await env.DB.prepare("SELECT body, updated_at FROM feeds WHERE name = 'events'").first<{ body: string; updated_at: string }>();
-  let body: Awaited<ReturnType<typeof fetchEvents>> | null = null;
-  if (row) {
-    body = JSON.parse(row.body);
-    if (Date.now() - Date.parse(row.updated_at) > STALE_MS) ctx.waitUntil(refreshEvents(env).catch(() => {}));
-  } else body = await refreshEvents(env).catch(e => { console.error(e); return null; });
-  if (!body) return json({ error: "The library's events list isn't answering right now." }, { status: 502 });
-  const now = Date.now();
+/** GET /api/events: the stored list without events that have ended. */
+export async function events(env: Env): Promise<Response> {
+  const row = await env.DB.prepare("SELECT body FROM feeds WHERE name = 'events'").first<{ body: string }>();
+  if (!row) return json({ error: "The events list hasn't loaded yet. Check back soon." }, { status: 503 });
+  const body: EventsBody = JSON.parse(row.body), now = Date.now();
   return json({ ...body, events: body.events.filter(e => Date.parse(e.end || e.start) > now) }, { headers: { "cache-control": "public, max-age=300" } });
 }
 
-/** The cron's job: refresh only when the stored list is old, since a refresh is about 16 requests to the library. */
-export async function refreshEventsIfStale(env: Env) {
+/** The cron's job: fail (so the editor hears after two runs) when the GitHub Action hasn't delivered for over a day. */
+export async function checkEvents(env: Env) {
   const row = await env.DB.prepare("SELECT updated_at FROM feeds WHERE name = 'events'").first<{ updated_at: string }>();
-  if (!row || Date.now() - Date.parse(row.updated_at) > STALE_MS) await refreshEvents(env);
+  if (!row) throw new Error("Library events have never arrived. Run the Events workflow on GitHub (Actions tab).");
+  if (Date.now() - Date.parse(row.updated_at) > STALE_MS) throw new Error(`Library events haven't arrived since ${row.updated_at}. Check the Events workflow on GitHub (Actions tab).`);
 }

@@ -53,8 +53,8 @@ features land on a codebase that can take them.
 
 **6c¾. Events tab** (built Nov. 5, pulled forward from Phase 7)
 - ✅ Halifax Public Libraries' events for the next two weeks: filters, Highlights, day-by-day list.
-- The library's feed refuses the Worker (**E1**): agree access with the library, or fetch it another way the editor
-  approves. Then add halifax.ca's events calendar once it has a feed.
+- ✅ The library's feed refuses the Worker (**E1**), so a GitHub Action fetches it every 6 hours and posts it to the site
+  (editor's decision, Nov. 5: the feed is public). Then add halifax.ca's events calendar once it has a feed.
 
 **6c½. Transit map** (v1 shipped Nov. 4)
 - ✅ Live buses and ferries, route filter, route lines, service alerts per route.

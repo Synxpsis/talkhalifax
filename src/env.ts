@@ -9,6 +9,8 @@ export interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   /** Bearer token the newsroom (Claude) uses to publish and update stories. A secret. */
   NEWSROOM_TOKEN?: string;
+  /** Bearer token the GitHub Action uses to post library events (scripts/events-token.mjs sets it). A secret. */
+  EVENTS_TOKEN?: string;
   /** Telegram bot (@BotFather) that sends the editor new drafts to approve. A secret. */
   TELEGRAM_BOT_TOKEN?: string;
   /** The editor's Telegram chat id; the bot replies with it on /start. With the token set, new articles need approval. */

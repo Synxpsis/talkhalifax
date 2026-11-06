@@ -33,7 +33,7 @@ Live at https://talkhalifax.alexwmmolloy.workers.dev. Repo: github.com/Synxpsis/
 | Weather and tides | `src/weather.ts` | Environment Canada (api.weather.gc.ca) and DFO tides (api-iwls.dfo-mpo.gc.ca) |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
-| Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them |
+| Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, every 6 hours) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
 | Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in on `/#alerts` (kinds, quiet hours). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
@@ -73,7 +73,7 @@ P3 `decisions`, P4 `community`.
 | halifax.ca road notices, Transit detours | Getting around list (shown as posted, not rewritten) | cron |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
 | Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `node scripts/build-transit.mjs`, by hand when the schedule changes |
-| Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | `/api/events`, refreshed by the cron when over 3 hours old (about 16 requests) |
+| Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | Fetched by the Events GitHub Action every 6 hours (about 16 requests) and posted to the Worker; the cron warns the editor when it's over 26 hours old |
 | Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
 | r/halifax | Signal: something may be happening | `trending` |
 
@@ -119,9 +119,9 @@ keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and
 
 On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (optional, not set yet),
-`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, not set yet).
+`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub).
 In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` once there is one.
-GitHub repository secret: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding).
+GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
 
 ## Agents running now
@@ -142,7 +142,6 @@ See [OPERATING-MODEL.md](OPERATING-MODEL.md) for what each one does. Debt and ga
 - **r/halifax returns HTTP 429** to the Worker (Reddit rate-limits Cloudflare's addresses), so the Reddit signal is
   usually missing. The journalist reports it and carries on.
 - **Turnstile is off** until a widget's keys are set. Sign-up has rate limits but no bot check.
-- **The library's events feed refuses requests from the Worker** (HTTP 403, while the same request from a computer
-  works), so the Events tab may be empty on the live site. See TECH-DEBT **E1**.
-- **Push alerts aren't on** until the VAPID keys are set.
+- **The library's events feed refuses requests from Cloudflare** (HTTP 403), so GitHub Actions fetches it (TECH-DEBT
+  **E1**). If that workflow stops, the Events tab keeps its last list and the cron warns after 26 hours.
 - Cron expressions are in UTC, so routines run an hour later in Halifax local time from November to March.

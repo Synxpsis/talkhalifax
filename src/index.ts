@@ -7,7 +7,7 @@ import { getWeather, refreshWeather } from "./weather";
 import { getAlerts, refreshAlerts } from "./alerts";
 import { telegramWebhook, tellEditor } from "./telegram";
 import { transit } from "./transit";
-import { events, refreshEventsIfStale } from "./events";
+import { checkEvents, events, ingestEvents } from "./events";
 import { pushApi } from "./push";
 export { ArticleRoom } from "./room";
 
@@ -156,7 +156,8 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
   if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
   if (path === "/api/alerts") return json({ alerts: await getAlerts(env, ctx) });
   if (path.startsWith("/api/transit/")) return transit(path);
-  if (path === "/api/events") return events(env, ctx);
+  if (path === "/api/events") return events(env);
+  if (path === "/api/events/ingest") return ingestEvents(req, env);
   if (path === "/api/push" || path.startsWith("/api/push/")) return pushApi(req, env, url);
 
   // The newsroom (Claude) publishes and updates stories here, with its own token
@@ -273,7 +274,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: refreshEventsIfStale, stages: evaluateStages, "clean-up": tidyUp };
+    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "clean-up": tidyUp };
     const results = await Promise.allSettled(Object.values(jobs).map(job => job(env)));
     await watchCron(env, Object.keys(jobs).map((name, i) => [name, results[i]] as const));
   },
