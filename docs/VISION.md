@@ -52,7 +52,7 @@ has nothing new, the right output is nothing.
 | 4 | Hardening: screening, reports, bans, resets, privacy page, Turnstile | Done |
 | 5 | **Operating model**: a team of agents with set jobs, briefings and audits on Telegram, documented | Done (exit test being watched) |
 | 6 | **Native experience**: installable app (PWA), offline reading, push alerts for P0 notices, mobile and desktop polish | In progress (installable, offline, push and Events are live) |
-| 7 | More sources: Halifax Water, Halifax Transit service alerts, Nova Scotia Health, more event calendars | Next |
+| 7 | More sources: Halifax Water (done), Halifax Transit service alerts, Nova Scotia Health, more event calendars | Next |
 | 8 | Off-site reach: social posts for P0 notices and the day's top stories, then a daily digest | Later |
 
 The detailed plan, with what each phase must prove before the next, is in [ROADMAP.md](ROADMAP.md).

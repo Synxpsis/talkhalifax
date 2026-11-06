@@ -10,6 +10,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 ```
  Official sources ──► Newsroom agents (Claude Code cloud routines)
  halifax.ca             │  through scripts/newsroom.mjs → POST /mcp (Bearer NEWSROOM_TOKEN)
+ halifaxwater.ca        │
  news.novascotia.ca     ▼
  rcmp.ca           Cloudflare Worker  src/index.ts ──► D1 database "talkhalifax"
  weather.gc.ca          │  /api/*, /auth/*, /mcp, /telegram/webhook, 30-minute cron
@@ -26,6 +27,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 |---|---|---|
 | Worker | `src/index.ts` | Routes, the 30-minute cron (current weather, weather warnings, a check on the Transit schedule's end date, a check that library events are arriving, story stages, clean-up) |
 | Auth | `src/auth.ts` | Password and Google sign-in, sessions (HttpOnly cookie), Turnstile, reset links, rate limits |
+| Halifax Water | `src/halifax-water.ts` | Reads its listing pages (it has no feed), sets how soon each is worked (on the site, only a boil-water advisory pins to Home), and strips the site-wide banner from its pages |
 | Stories | `src/stories.ts` | Saving stories and versions, Developing → Articles, comments, approvals |
 | Chat rooms | `src/room.ts` | One Durable Object per story: history, presence, typing, screening, bans, removals |
 | Screening | `src/screen.ts` | Rules (slurs, phone numbers, emails, new-account links), then Llama Guard with a 3 s limit |
@@ -69,6 +71,7 @@ P3 `decisions`, P4 `community`.
 | Source | Used for | How |
 |---|---|---|
 | halifax.ca news releases | Articles and notices | `scan_sources`, `read_release` |
+| halifaxwater.ca notices, alerts and news | Water notices (boil-water advisories, shut-offs, main repairs, traffic advisories) | same; `scan_sources` lists it under `unavailable` if the site can't be read |
 | news.novascotia.ca | Provincial stories that touch Halifax | same |
 | rcmp.ca (Halifax-area detachments) | Police notices, always reviewed | same |
 | Environment Canada | Weather warnings (notices and banners), current conditions (header and menu) | `conditions`, cron |

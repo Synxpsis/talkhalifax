@@ -75,7 +75,8 @@ once approved, reaches an opted-in phone within a minute; Lighthouse PWA and acc
 More coverage comes from more official sources, never from a lower bar. The source scout proposes sources each Monday,
 and the editor picks.
 
-- Halifax Transit service alerts (beyond detours) and Halifax Water notices (boil orders, main breaks) as P0 notices.
+- ✅ Halifax Water notices (boil orders, main breaks) as P0 notices (Nov. 6).
+- Halifax Transit service alerts (beyond detours) as P0 notices.
 - Nova Scotia Health releases that name Halifax-area sites.
 - More event calendars beside the library's (halifax.ca once it has a feed, other official ones the scout finds).
 - Fix or drop the Reddit signal (**N5**).

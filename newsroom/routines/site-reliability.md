@@ -16,7 +16,7 @@ Checks (record each as ok or a problem with the exact error or value):
 3. **Freshness:** `updatedAt` in `/api/alerts` and `observedAt` in `/api/weather` are within the last 3 hours, and `updatedAt` in `/api/events` is within the last 26 hours (a GitHub Action delivers it every 6). Read `tool desk_status`: if no story was published in the last 24 hours and `leads` shows open leads,
    that's a problem (the journalist may be stuck).
 4. **Newsroom:** `tool list_leads` works. `tool scan_sources '{"days":1}'` and `tool conditions` work; note any
-   source inside them reporting an error or `unavailable` (Reddit's 429 is known: mention it only if every other
+   source inside them reporting an error or listed in `unavailable` (Reddit's 429 is known: mention it only if every other
    check passed and it's the first run of the day, that is between 0:00 and 6:00 Halifax time).
 5. **Overdue work:** from `desk_status`, more than 10 check-ins overdue, or a draft or held update waiting over 12 hours.
 

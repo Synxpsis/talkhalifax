@@ -162,6 +162,7 @@
   /** What a city notice is about, from its section and headline. */
   function noticeType(n) {
     const s = (n.section || "").toLowerCase(), h = (n.headline || "").toLowerCase();
+    if (s === "halifax water") return "Water"; // "emergency" here is usually one street's shut-off, not a city emergency
     if (/fire|emergenc/.test(s) || /\b(fire|evacuat|emergency|hazmat|shelter in place)/.test(h)) return "Emergency";
     if (/police/.test(s) || /\b(police|rcmp|homicide|arrest|charged|missing (person|man|woman|youth|boy|girl))/.test(h)) return "Police";
     if (/winter/.test(s) || /parking ban|snow|plow/.test(h)) return "Winter";

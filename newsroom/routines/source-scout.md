@@ -14,7 +14,7 @@ A good source:
 
 Already covered (read `docs/PLATFORM.md`, "Sources"): halifax.ca news releases, news.novascotia.ca, Halifax-area RCMP,
 Environment Canada warnings, Nova Scotia Power outages, Halifax Transit's live feeds and Halifax Public Libraries' events.
-Already wanted: Halifax Public Libraries events, Halifax Water, Halifax Transit service alerts, Nova Scotia Health.
+Already wanted: Halifax Transit service alerts, Nova Scotia Health.
 
 Each run:
 1. Read `docs/VISION.md` and `docs/PLATFORM.md`.

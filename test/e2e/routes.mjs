@@ -25,6 +25,8 @@ const SEED = STORIES.map(s => `INSERT INTO stories (id, kind, section, area, hea
   VALUES (${[s.id, s.kind, "City Hall", "Halifax", s.headline, "A dek", "[]", '["A sentence."]', "[]", "https://www.halifax.ca/", now, now, s.stage, now].map(q).join(", ")});`).join(" ");
 
 const WEATHER = JSON.stringify({ updatedAt: now, observedAt: now, station: "Test", condition: "Sunny", tempC: 15, feelsLikeC: 15, icon: "clear", night: false, url: "https://weather.gc.ca/" });
+const waterNotice = (id, headline) => `INSERT INTO stories (id, kind, section, area, headline, dek, facts, body, means, source_url, published_at, updated_at, stage, developing_since) VALUES (${[id, "notice", "Halifax Water", "Halifax", headline, "A dek", "[]", '["A sentence."]', "[]", "https://www.halifaxwater.ca/", now, now, "developing", now].map(q).join(", ")});`;
+const SEED_WATER = waterNotice("hw-e2e-shutoff", "One Street - Emergency Water Service Shut Down") + waterNotice("hw-e2e-boil", "Boil Water Advisory for one area");
 const SEED_WEATHER = `INSERT INTO feeds (name, body, updated_at) VALUES ('weather', '${WEATHER}', '${now}');`;
 
 function browserPath() {
@@ -42,7 +44,7 @@ const ok = (c, label, extra = "") => { console.log(`${c ? "PASS" : "FAIL"} ${lab
 
 rmSync(DATA, { recursive: true, force: true });
 npx([...WRANGLER, "d1", "migrations", "apply", "talkhalifax-test", "--local", "--persist-to", DATA]);
-writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WEATHER}`);
+writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WATER} ${SEED_WEATHER}`);
 npx([...WRANGLER, "d1", "execute", "talkhalifax-test", "--local", "--persist-to", DATA, "--file", `${DATA}/seed.sql`]);
 
 const server = spawn("npx", [...WRANGLER, "dev", "--port", String(PORT), "--persist-to", DATA], { stdio: "ignore", shell: win, detached: !win, env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
@@ -124,6 +126,18 @@ try {
         ok((await p.evaluate(() => document.getElementById("hdrWx").innerText)).includes("Feels like 15°C"), `${label}: it reads as feels like`);
       }
       await p.close();
+    }
+
+    // Only a boil-water advisory pins to Home; one street's emergency shut-off stays on Notices
+    {
+      const p = await open("home");
+      const bars = await p.evaluate(() => document.getElementById("abars").innerText);
+      ok(bars.includes("Boil Water Advisory"), `${label}: a boil-water advisory pins to Home`);
+      ok(!bars.includes("One Street"), `${label}: a one-street shut-off doesn't`);
+      await p.close();
+      const n = await open("notices");
+      ok((await n.evaluate(() => document.getElementById("notices").innerText)).includes("One Street"), `${label}: the shut-off is on Notices`);
+      await n.close();
     }
 
     // Moving between pages without reloading

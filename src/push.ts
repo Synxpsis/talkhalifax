@@ -4,10 +4,11 @@
 import { Env, json, SITE } from "./env";
 import { allow, sameOrigin } from "./auth";
 
-export const KINDS = ["weather", "outages", "roads", "safety", "other"] as const;
+export const KINDS = ["weather", "outages", "roads", "water", "safety", "other"] as const;
 export type Kind = typeof KINDS[number];
 export const KIND_LABELS: Record<Kind, string> = {
   weather: "Weather warnings", outages: "Power outages", roads: "Roads, traffic and transit",
+  water: "Water repairs and shut-offs",
   safety: "Police, fire and emergencies", other: "Other urgent notices",
 };
 const DEFAULT_KINDS: Kind[] = ["weather", "outages", "safety", "other"];
@@ -64,6 +65,9 @@ export function alertKind(s: { id: string; section?: string | null; headline?: s
   const t = `${s.section || ""} ${s.headline || ""}`;
   if (/^weather-/.test(s.id)) return "weather";
   if (/^ns-power-outages-/.test(s.id)) return "outages";
+  if (/boil[- ]water/i.test(t)) return "safety";
+  // Halifax Water posts routine work often, so it's its own choice and off by default; emergencies stay urgent for everyone
+  if (s.section === "Halifax Water") return /emergency|water quality|contaminat/i.test(t) ? "safety" : /traffic advisory/i.test(t) ? "roads" : "water";
   if (/road|traffic|closure|detour|transit|ferry|bus|winter operations|parking ban/i.test(t)) return "roads";
   if (/police|rcmp|fire|missing|evacuat|emergenc|shelter|boil|water main|hazmat|lockdown/i.test(t)) return "safety";
   return "other";

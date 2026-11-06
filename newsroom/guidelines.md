@@ -124,6 +124,14 @@ Decide one `kind` per release:
   the enforcement window exactly as the release does (e.g. "Overnight winter parking ban enforced 1-6 a.m. Wednesday, March 4").
   If the window in a ban release has already passed by the time you write, publish it as a `skip` with `reason`
   "Enforcement window already over".
+  Halifax Water releases (section "Halifax Water", ids starting `hw-`) are always notices. Cover boil-water and
+  water-quality advisories, emergency shut-offs, water main repairs that affect service, and traffic advisories for
+  work still ahead. Headlines name the street or area. Say what the release says about service and restoration; if it
+  gives no estimate, say so. Work that's already over is a `skip` with `reason` "Work already over". Work the release
+  says has no effect on water service or traffic is a `skip` with `reason` "No effect on service or traffic".
+  A boil-water advisory publishes at once like any notice, without `review`: people need it now, even overnight. Copy
+  its area, instructions and times exactly. When a later Halifax Water release says the same work is finished or an
+  advisory is lifted, update or replace the earlier notice.
 - `skip`: nothing left to act on or discuss, e.g. an event that is already over, or a holiday service-hours
   notice whose date has passed. Add a short `reason`.
 

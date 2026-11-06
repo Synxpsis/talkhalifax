@@ -6,6 +6,7 @@ import { NewsroomError, journalist, newsroomAuthorized, saveStory } from "./stor
 import { tellEditor, approvalOn } from "./telegram";
 import { allow } from "./auth";
 import { weatherWarnings } from "./alerts";
+import { HALIFAX_WATER, WATER_PAGES, parseWaterListing, waterCategory, waterPageBody, waterPublished } from "./halifax-water";
 import GUIDELINES from "../newsroom/guidelines.md";
 
 const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -81,10 +82,10 @@ const TOOLS = [
   { name: "get_guidelines", description: "The TalkHalifax writing guidelines. Read before writing or updating anything.", inputSchema: S({}) },
   { name: "my_profile", description: "Your TalkHalifax account as the newsroom's journalist: your name, public bio and private persona. If you don't have one yet, it says so: create it with set_profile.", inputSchema: S({}) },
   { name: "set_profile", description: "Create your journalist account (once: name, bio and persona), or later update your bio and persona. Your name is permanent once set. You are credited as the author of every story you publish.", inputSchema: S({ name: str("First and last name you chose, e.g. 'Maren Whitlock'. Invented, never a real person's name. Set once."), bio: str("Public bio shown under your stories, 1–2 sentences. Must say you're an AI journalist."), persona: str("Private notes on who you are: background, beat, voice, what you care about. Read it at the start of each run.") }, ["bio", "persona"]) },
-  { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…), the Nova Scotia government and Nova Scotia RCMP (Halifax-area releases only), each with a suggested category and whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
+  { name: "scan_sources", description: "Recent official releases (newest first) from halifax.ca (city hall, police, road closures, transit, water, winter operations…), Halifax Water, the Nova Scotia government and Nova Scotia RCMP (Halifax-area releases only), each with a suggested category and whether it is already a story, a lead, or new.", inputSchema: S({ days: { type: "integer", minimum: 1, maximum: 45, description: "How far back (default 14)" } }) },
   { name: "trending", description: "What Nova Scotians are searching on Google right now, with rough search counts and the headlines behind each search. Searches that look Halifax-related are marked local and matched to leads and stories. Also the newest posts on Reddit's r/halifax, flagged when they sound like something happening now. Both are signals of attention only, never a source of facts.", inputSchema: S({}) },
   { name: "conditions", description: "Live official conditions: Environment Canada weather warnings, watches and statements for Halifax, and Nova Scotia Power's outage totals for the province. Each comes with a ready lead (title, source_url, suggested story id) and whether it is already a lead or story. The facts here are the source for those stories.", inputSchema: S({}) },
-  { name: "read_release", description: "The English text of an official release (halifax.ca, news.novascotia.ca or rcmp.ca), ready to write from.", inputSchema: S({ url: str("Release URL") }, ["url"]) },
+  { name: "read_release", description: "The English text of an official release (halifax.ca, halifaxwater.ca, news.novascotia.ca or rcmp.ca), ready to write from.", inputSchema: S({ url: str("Release URL") }, ["url"]) },
   { name: "list_stories", description: "Stories on the site: id, kind, stage, version, headline, last update, chat and comment counts.", inputSchema: S({ stage: { type: "string", enum: ["developing", "archived", "draft", "all"], description: "Default: all published (developing + archived)" }, limit: { type: "integer", minimum: 1, maximum: 200 } }) },
   { name: "get_story", description: "One story in full, with its recent version history.", inputSchema: S({ id: str("Story id") }, ["id"]) },
   { name: "publish_story", description: "Create a new story. It appears under Developing with a live chat, or waits for a moderator if review is true. Fails if the id exists.", inputSchema: S({ id: str("Use the source release's slug, e.g. municipality-seeks-public-input-…"), ...STORY_FIELDS, note: str("Optional note for the version history"), review: { type: "boolean", description: "Hold as a draft for moderator approval" }, author: str("Your role or name, e.g. writer") }, ["id", "kind", "headline", "source", "publishedAt"]) },
@@ -158,42 +159,67 @@ async function rcmpReleases(): Promise<Release[]> {
   return out;
 }
 
+/** Halifax Water's notices, alerts and news, from its listing pages. Its slugs can repeat the city's, so ids start "hw-". */
+async function waterReleases(): Promise<{ releases: Release[]; failed: boolean }> {
+  const pages = await Promise.allSettled(WATER_PAGES.map(p => fetchText(HALIFAX_WATER + p)));
+  const seen = new Map<string, Release>();
+  for (const p of pages) if (p.status === "fulfilled") for (const i of parseWaterListing(p.value)) {
+    if (!seen.has(i.path)) seen.set(i.path, { id: `hw-${slugOf(i.path)}`, title: i.title, url: HALIFAX_WATER + i.path, source: "halifaxwater.ca", section: "Halifax Water", category: waterCategory(i), publishedAt: i.publishedAt, summary: i.summary });
+  }
+  return { releases: [...seen.values()], failed: pages.every(p => p.status === "rejected") };
+}
+
 async function scanSources(env: Env, days: number) {
   const cutoff = now() - days * 864e5;
-  const lists = await Promise.all([...FEEDS.map(f => halifaxReleases(...f)), provinceReleases(days > 7 ? 4 : 2), rcmpReleases()]);
+  const [water, ...lists] = await Promise.all([waterReleases(), ...FEEDS.map(f => halifaxReleases(...f)), provinceReleases(days > 7 ? 4 : 2), rcmpReleases()]) as [Awaited<ReturnType<typeof waterReleases>>, ...Release[][]];
+  lists.push(water.releases);
+  const unavailable = water.failed ? { unavailable: ["halifaxwater.ca"] } : {};
   const seen = new Map<string, Release>();
   // A day's slack: provincial releases carry only their date
   for (const r of lists.flat()) if (r.url && r.publishedAt && Date.parse(r.publishedAt) >= cutoff - 864e5 && !seen.has(r.url)) seen.set(r.url, r);
   for (const r of seen.values()) if (URGENT.test(r.title)) r.category = "right-now";
   const items = [...seen.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  if (!items.length) return { releases: [] };
+  if (!items.length) return { releases: [], ...unavailable };
   const ids = items.map(i => i.id), urls = items.map(i => i.url);
-  const stories = await env.DB.prepare(`SELECT id, kind, stage FROM stories WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<{ id: string; kind: string; stage: string }>();
-  const leads = await env.DB.prepare(`SELECT id, source_url, status FROM leads WHERE source_url IN (${urls.map(() => "?").join(",")})`).bind(...urls).all<{ id: string; source_url: string; status: string }>();
-  const sMap = new Map(stories.results.map(s => [s.id, s])), lMap = new Map(leads.results.map(l => [l.source_url, l]));
+  // D1 takes 100 values to a query
+  const inBatches = async <T>(values: string[], sql: (marks: string) => string) => {
+    const out: T[] = [];
+    for (let i = 0; i < values.length; i += 90) {
+      const part = values.slice(i, i + 90);
+      out.push(...(await env.DB.prepare(sql(part.map(() => "?").join(","))).bind(...part).all<T>()).results);
+    }
+    return out;
+  };
+  const stories = await inBatches<{ id: string; kind: string; stage: string }>(ids, m => `SELECT id, kind, stage FROM stories WHERE id IN (${m})`);
+  const leads = await inBatches<{ id: string; source_url: string; status: string }>(urls, m => `SELECT id, source_url, status FROM leads WHERE source_url IN (${m})`);
+  const sMap = new Map(stories.map(s => [s.id, s])), lMap = new Map(leads.map(l => [l.source_url, l]));
   return {
     releases: items.map(i => {
       const s = sMap.get(i.id), l = lMap.get(i.url);
       return { ...i, status: s ? `story (${s.kind}, ${s.stage})` : l ? `lead ${l.id} (${l.status})` : "new" };
     }),
+    ...unavailable,
   };
 }
 
 async function readRelease(url: string) {
   let u: URL;
   try { u = new URL(url); } catch { throw new NewsroomError("That isn't a valid URL."); }
-  if (u.protocol !== "https:" || !/(^|\.)(halifax\.ca|novascotia\.ca|rcmp\.ca)$/.test(u.hostname)) throw new NewsroomError("read_release only reads halifax.ca, novascotia.ca and rcmp.ca pages.");
+  if (u.protocol !== "https:" || !/(^|\.)(halifax\.ca|halifaxwater\.ca|novascotia\.ca|rcmp\.ca)$/.test(u.hostname)) throw new NewsroomError("read_release only reads halifax.ca, halifaxwater.ca, novascotia.ca and rcmp.ca pages.");
+  const isWater = /(^|\.)halifaxwater\.ca$/.test(u.hostname);
   let page = await fetchText(u.toString());
-  const published = page.match(/<time[^>]*datetime="([^"]+)"/)?.[1] || null;
+  // Halifax Water's pages open with a site-wide banner and its date, which aren't this release's
+  if (isWater) page = waterPageBody(page);
+  const published = isWater ? waterPublished(page) : page.match(/<time[^>]*datetime="([^"]+)"/)?.[1] || null;
   const main = page.indexOf("<main");
   if (main > 0) page = page.slice(main);
   page = page.replace(/<(script|style|nav|footer)[^>]*>[\s\S]*?<\/\1>/gi, "");
   let text = unescape(unescape(page.replace(/<(br|\/p|\/li|\/h\d|\/div)[^>]*>/gi, "\n").replace(/<[^>]+>/g, " ")))
     .replace(/[ \t ]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
   // The English text comes first; stop where the French version or the site footer starts
-  const cut = [text.indexOf("Message d’intérêt"), text.indexOf("*****"), text.indexOf("Explore this site"), text.indexOf("\nLa Municipalité"), text.indexOf("\nLa municipalité"), text.indexOf("\n Follow Us"), text.indexOf("\nFollow Us")].filter(k => k > 0);
+  const cut = [text.indexOf("Footer menu"), text.indexOf("Message d’intérêt"), text.indexOf("*****"), text.indexOf("Explore this site"), text.indexOf("\nLa Municipalité"), text.indexOf("\nLa municipalité"), text.indexOf("\n Follow Us"), text.indexOf("\nFollow Us")].filter(k => k > 0);
   if (cut.length) text = text.slice(0, Math.min(...cut));
-  const id = u.hostname.endsWith("rcmp.ca") ? `rcmp-${slugOf(u.toString())}` : slugOf(u.toString());
+  const id = u.hostname.endsWith("rcmp.ca") ? `rcmp-${slugOf(u.toString())}` : isWater ? `hw-${slugOf(u.toString())}` : slugOf(u.toString());
   return { url: u.toString(), id, ...(published ? { published } : {}), text: text.slice(0, 12000) };
 }
 
