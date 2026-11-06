@@ -20,7 +20,7 @@ The team is running, stale facts are caught within the hour, and a broken deploy
 | ✅ A smoke test after every deploy, with automatic rollback | C2 | A deliberately broken deploy rolls itself back in CI |
 | ✅ The cron tells the editor when it keeps failing | D4 | Two failed weather or stage runs in a row send one Telegram note |
 | ✅ One line-ending rule for the whole repo | C6 | `.gitattributes` committed; no CRLF notes left in CLAUDE.md |
-| Turnstile keys set (editor) | D3 | Moved to 6a: the editor is setting them on Nov. 5 |
+| ✅ Turnstile keys set (editor) | D3 | Moved to 6a; done Nov. 6 |
 
 **Exit test** (watched through the week of Nov. 9 while Phase 6 starts): a week in which the standards editor finds no stale facts, the editor approves in minutes a day, and
 site reliability sends no alerts that weren't real.
@@ -31,7 +31,7 @@ Make TalkHalifax feel like an app on a phone and a calm reading room on a deskto
 features land on a codebase that can take them.
 
 **6a. Ground work**
-- Turnstile keys set by the editor, so sign-up has a bot check (**D3**).
+- ✅ Turnstile keys set by the editor, so sign-up has a bot check (**D3**, Nov. 6).
 - ✅ Upgrade wrangler, workers-types and the compatibility date (**C3**).
 - Split `app.js` into modules and move the CSS to its own file, no bundler (**C4**).
 - ✅ First automated tests: screening rules, check-in and stage timing, pending updates, bans and rate limits, run in CI

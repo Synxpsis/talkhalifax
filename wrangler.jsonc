@@ -30,7 +30,8 @@
   "vars": {
     // Comma-separated emails (Google sign-in) and usernames (password sign-in) that get the moderator role.
     "ADMIN_EMAILS": "alex@lab168.ca,alexwmmolloy@gmail.com",
-    "ADMIN_USERNAMES": "admin"
+    "ADMIN_USERNAMES": "admin",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAF2Lk62vgkTC9ISs"
   },
   "observability": { "enabled": true }
 }

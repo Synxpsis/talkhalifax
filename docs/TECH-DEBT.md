@@ -1,6 +1,6 @@
 # TalkHalifax: tech debt
 
-_Last reviewed November 5, 2026. Re-check every few weeks, and move items to "Paid off" when they land._
+_Last reviewed November 6, 2026. Re-check every few weeks, and move items to "Paid off" when they land._
 
 Things that work today but will cost us later: shortcuts, gaps and risks. Each item has a priority:
 
@@ -36,7 +36,6 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 |---|---|---|---|---|---|
 | D1 | **`message_index` is never pruned.** It keeps a copy of every chat message forever, and room storage keeps the history of archived rooms. | It grows without limit, and the privacy page should say how long chat is kept | Decide a retention period (for example 12 months), delete older rows in the cron, and say so on `/#privacy` | Medium | S |
 | D2 | **No written restore plan.** D1 Time Travel can restore the last 30 days, but nobody has tried it, and Durable Object chat storage isn't covered. | A bad migration or a bulk delete could lose stories or chat | Write a short runbook (`wrangler d1 time-travel`), try it once against a copy, and add a weekly D1 export to R2 | Medium | M |
-| D3 | **Turnstile is off.** Sign-up has rate limits but no bot check. | Bot sign-ups once the site is shared | The editor creates the widget and sets the keys (see README) | Medium | S |
 | D5 | **Personal email addresses sit in `wrangler.jsonc`** (`ADMIN_EMAILS`), which is in the repo. They aren't on the site. | The repo is less private than it looks; anyone given access sees them | Move `ADMIN_EMAILS` to a secret, or match admins by user id | Low | S |
 
 ## Docs
@@ -47,6 +46,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 
 ## Paid off
 
+- **Nov. 6, 2026:** Turnstile is on for sign-up, with tests for accepted, rejected, missing and unreachable checks (**D3**).
 - **Nov. 5, 2026:** the weather and tides feed and the unused road and Transit detour collection are removed (editor's decision). Weather warnings stay, and a failed refresh now reaches the cron's warning.
 - **Nov. 5, 2026:** first automated tests, run by CI before every deploy (**C1**, first slice; the rest stays open above).
 - **Nov. 5, 2026:** GitHub Actions upgraded to `checkout` and `setup-node` v7, which end the Node 20 warnings.

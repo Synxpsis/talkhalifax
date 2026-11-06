@@ -119,9 +119,9 @@ keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and
 ## Secrets and settings
 
 On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
-`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (optional, not set yet),
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (set Nov. 6),
 `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub).
-In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` once there is one.
+In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` (public).
 GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
 
@@ -142,7 +142,6 @@ See [OPERATING-MODEL.md](OPERATING-MODEL.md) for what each one does. Debt and ga
 
 - **r/halifax returns HTTP 429** to the Worker (Reddit rate-limits Cloudflare's addresses), so the Reddit signal is
   usually missing. The journalist reports it and carries on.
-- **Turnstile is off** until a widget's keys are set. Sign-up has rate limits but no bot check.
 - **The library's events feed refuses requests from Cloudflare** (HTTP 403), so GitHub Actions fetches it (TECH-DEBT
   **E1**). If that workflow stops, the Events tab keeps its last list and the cron warns after 26 hours.
 - Cron expressions are in UTC, so routines run an hour later in Halifax local time from November to March.
