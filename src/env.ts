@@ -2,7 +2,8 @@ export interface Env {
   DB: D1Database;
   ROOMS: DurableObjectNamespace;
   ASSETS: Fetcher;
-  ADMIN_EMAILS: string;
+  /** Comma-separated Google emails that get the moderator role. A secret, because the repo is public. */
+  ADMIN_EMAILS?: string;
   /** Comma-separated usernames that get the moderator role. */
   ADMIN_USERNAMES: string;
   GOOGLE_CLIENT_ID?: string;

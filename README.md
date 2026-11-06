@@ -52,7 +52,7 @@ Secrets live on the Worker, not in the repo:
 - `EVENTS_TOKEN`: lets the Events GitHub Action post library events. `node scripts/events-token.mjs` makes one and stores it on the Worker and as a GitHub repository secret
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: push alerts stay off without them. Make and store both with `node scripts/vapid-keys.mjs` (run it once: a new pair turns everyone's alerts off). For a local run, pass test keys with `--var`
 
-Moderators: `ADMIN_USERNAMES` (and `ADMIN_EMAILS` for Google) in `wrangler.jsonc`.
+Moderators: `ADMIN_USERNAMES` in `wrangler.jsonc`. If Google sign-in is turned on, also `npx wrangler secret put ADMIN_EMAILS` (comma-separated; a secret because this repo is public).
 
 ## Moderation
 

@@ -36,7 +36,7 @@ The [roadmap](ROADMAP.md) says when each one is scheduled.
 |---|---|---|---|---|---|
 | D1 | **`message_index` is never pruned.** It keeps a copy of every chat message forever, and room storage keeps the history of archived rooms. | It grows without limit, and the privacy page should say how long chat is kept | Decide a retention period (for example 12 months), delete older rows in the cron, and say so on `/#privacy` | Medium | S |
 | D2 | **No written restore plan.** D1 Time Travel can restore the last 30 days, but nobody has tried it, and Durable Object chat storage isn't covered. | A bad migration or a bulk delete could lose stories or chat | Write a short runbook (`wrangler d1 time-travel`), try it once against a copy, and add a weekly D1 export to R2 | Medium | M |
-| D5 | **Personal email addresses sit in `wrangler.jsonc`** (`ADMIN_EMAILS`), which is in the repo. They aren't on the site. | The repo is less private than it looks; anyone given access sees them | Move `ADMIN_EMAILS` to a secret, or match admins by user id | Low | S |
+| D5 | **Personal email addresses are still in git history.** The repo is public. `ADMIN_EMAILS` left the config on Nov. 6, but past commits still show it, and every commit's author email shows too. They aren't on the site. | Anyone can read them | Editor's decision: make the repo private, or rewrite history and use GitHub's no-reply address for commits | Medium | S |
 
 ## Docs
 

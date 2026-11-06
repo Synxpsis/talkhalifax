@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "talkhalifax",
-  // alexwmmolloy@gmail.com's account. Pinned so deploys (local or from GitHub) can't land on another account.
+  // The editor's Cloudflare account. Pinned so deploys (local or from GitHub) can't land on another account.
   "account_id": "5b365e1eb102c26b07e110dae02fbfa9",
   "main": "src/index.ts",
   // newsroom/guidelines.md is bundled as text so agents can read it through the MCP get_guidelines tool
@@ -24,12 +24,11 @@
   // Workers AI screens chat messages and comments (Llama Guard) before they post.
   "ai": { "binding": "AI" },
 
-  // Weather, tides and the Getting around alerts every 30 minutes.
+  // Weather warnings, the events check, story stages and clean-up every 30 minutes.
   "triggers": { "crons": ["*/30 * * * *"] },
 
   "vars": {
-    // Comma-separated emails (Google sign-in) and usernames (password sign-in) that get the moderator role.
-    "ADMIN_EMAILS": "alex@lab168.ca,alexwmmolloy@gmail.com",
+    // Comma-separated usernames that get the moderator role (for Google sign-in, the ADMIN_EMAILS secret).
     "ADMIN_USERNAMES": "admin",
     "TURNSTILE_SITE_KEY": "0x4AAAAAAF2Lk62vgkTC9ISs"
   },

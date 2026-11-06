@@ -12,5 +12,5 @@
   ],
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }],
-  "vars": { "ADMIN_EMAILS": "", "ADMIN_USERNAMES": "admin" }
+  "vars": { "ADMIN_USERNAMES": "admin" }
 }

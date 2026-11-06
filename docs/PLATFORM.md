@@ -107,7 +107,7 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 - **Profiles**: your own (messages, password change, delete account, moderator reports) and public ones (the journalist's
   byline links to hers).
 - **Moderators**: approve drafts in the browser or on Telegram, remove reported items, ban or ban-and-purge, make reset
-  links. Moderators are listed in `ADMIN_EMAILS` / `ADMIN_USERNAMES` in `wrangler.jsonc`.
+  links. Moderators are listed in `ADMIN_USERNAMES` in `wrangler.jsonc`, and for Google sign-in in the `ADMIN_EMAILS` secret.
 - **Privacy** page at `/#privacy`, linked from the footer, menu and sign-up.
 
 ## Data (D1 tables)
@@ -120,9 +120,9 @@ keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and
 ## Secrets and settings
 
 On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
-`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional), `TURNSTILE_SECRET` (set Nov. 6),
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and `ADMIN_EMAILS` (optional, for Google sign-in, none set), `TURNSTILE_SECRET` (set Nov. 6),
 `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub).
-In `wrangler.jsonc` vars: `ADMIN_EMAILS`, `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` (public).
+In `wrangler.jsonc` vars: `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` (public).
 GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
 

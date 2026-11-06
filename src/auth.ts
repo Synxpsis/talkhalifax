@@ -240,8 +240,8 @@ export async function currentUser(req: Request, env: Env): Promise<User | null> 
   ).bind(sid, Date.now()).first<User>();
 }
 
-async function upsertUser(env: Env, p: { provider: string; sub: string; name: string; avatar: string; email: string }) {
-  const admins = env.ADMIN_EMAILS.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+export async function upsertUser(env: Env, p: { provider: string; sub: string; name: string; avatar: string; email: string }) {
+  const admins = (env.ADMIN_EMAILS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
   const role = p.email && admins.includes(p.email.toLowerCase()) ? "moderator" : "member";
   const existing = await env.DB.prepare("SELECT id FROM users WHERE provider = ? AND provider_sub = ?")
     .bind(p.provider, p.sub).first<{ id: string }>();
