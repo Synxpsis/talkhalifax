@@ -8,7 +8,7 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 - `src/index.ts`: the Worker: `/api/*`, `/auth/*`, `/rooms/<story>/ws`, and a 30-minute cron for weather and weather warnings, story stages and clean-up
 - `src/alerts.ts`: Environment Canada weather warnings for the banners and Notices, shown as posted with links (not rewritten)
 - `src/transit.ts` and `public/transit.js`: the live Transit map (Halifax Transit's real-time feeds). A GitHub Action (`.github/workflows/transit.yml`) rebuilds the map's data once Halifax Transit's new schedule starts, and deploys it
-- `src/events.ts` and `public/events.js`: the Events tab, from Halifax Public Libraries' events feed (the next two weeks). The feed refuses Cloudflare, so [.github/workflows/events.yml](.github/workflows/events.yml) runs `scripts/fetch-events.mjs` every 6 hours and posts it to the site
+- `src/events.ts` and `public/events.js`: the Events tab, from Halifax Public Libraries' events feed (the next two weeks). The feed refuses Cloudflare, so [.github/workflows/events.yml](.github/workflows/events.yml) runs `scripts/fetch-events.mjs` every 6 hours, started by the Worker's cron, and posts it to the site
 - `src/push.ts`, `public/alerts.js` and `public/sw.js`: push alerts for urgent notices (sent only when the editor taps "Send alert" on Telegram), and the service worker that also keeps the app readable offline. `public/manifest.webmanifest` and `public/icons/` make it installable
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing
 - `src/auth.ts`: sessions (HttpOnly cookie), Google sign-in, and a localhost-only dev sign-in
@@ -50,6 +50,7 @@ Secrets live on the Worker, not in the repo:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: optional; Google sign-in stays off without them
 - `TURNSTILE_SECRET`: optional, with the public `TURNSTILE_SITE_KEY` var in `wrangler.jsonc`; sign-up asks for Cloudflare's bot check only when both are set
 - `EVENTS_TOKEN`: lets the Events GitHub Action post library events. `node scripts/events-token.mjs` makes one and stores it on the Worker and as a GitHub repository secret
+- `GITHUB_ACTIONS_TOKEN`: lets the Worker's cron start the Events and Transit jobs. A fine-grained GitHub token for this repository with Actions read and write
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: push alerts stay off without them. Make and store both with `node scripts/vapid-keys.mjs` (run it once: a new pair turns everyone's alerts off). For a local run, pass test keys with `--var`
 
 Moderators: `ADMIN_USERNAMES` in `wrangler.jsonc`. If Google sign-in is turned on, also `npx wrangler secret put ADMIN_EMAILS` (comma-separated; a secret because this repo is public).

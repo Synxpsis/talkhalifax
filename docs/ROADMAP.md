@@ -1,6 +1,6 @@
 # TalkHalifax: roadmap
 
-_Last updated November 5, 2026. [VISION.md](VISION.md) says why, this file says what's next and in what order,
+_Last updated November 6, 2026. [VISION.md](VISION.md) says why, this file says what's next and in what order,
 and [TECH-DEBT.md](TECH-DEBT.md) has the items marked like **N1**._
 
 The order follows the principles: first keep facts right, then keep the site up, then make it feel native, then grow.
@@ -53,7 +53,7 @@ features land on a codebase that can take them.
 
 **6c¾. Events tab** (built Nov. 5, pulled forward from Phase 7)
 - ✅ Halifax Public Libraries' events for the next two weeks: filters, Highlights, day-by-day list.
-- ✅ The library's feed refuses the Worker (**E1**), so a GitHub Action fetches it every 6 hours and posts it to the site
+- ✅ The library's feed refuses the Worker (**E1**), so a GitHub Action, started by the Worker's cron, fetches it every 6 hours and posts it to the site
   (editor's decision, Nov. 5: the feed is public). Then add halifax.ca's events calendar once it has a feed.
 
 **6c½. Transit map** (v1 shipped Nov. 4)
@@ -62,6 +62,7 @@ features land on a codebase that can take them.
   Worker's CPU time first). ✅ The schedule data rebuilds automatically (**N8**, Nov. 6).
 
 **6d. Polish**
+- ✅ The article page rebuilt around what readers need first: "What to do", subheadings, compact facts (Nov. 6).
 - Mobile: safe areas, chat keyboard handling, swipe back from a story, faster first load.
 - Desktop: reading width, chat docked beside the story, keyboard shortcuts.
 - A styleguide page that shows every component in both themes.

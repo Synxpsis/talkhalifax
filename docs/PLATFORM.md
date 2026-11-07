@@ -38,7 +38,7 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 | Weather warnings | `src/alerts.ts` | Environment Canada warnings, watches and statements for the banners, Notices and `conditions` |
 | Site | `public/index.html`, `public/app.js` | The page, CSS design system and all views (see [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)) |
 | Transit map | `src/transit.ts`, `public/transit.js`, `scripts/build-transit.mjs` | Live buses and ferries and service alerts from Halifax Transit's GTFS-realtime feeds; route lines and names from its GTFS schedule |
-| Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, every 6 hours) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
+| Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, started every 6 hours by the Worker's cron, `src/github-jobs.ts`) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
 | Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in from the Alerts section of their profile, no account needed (kinds, quiet hours; `/#alerts` links land there). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
@@ -77,7 +77,7 @@ P3 `decisions`, P4 `community`.
 | Environment Canada | Weather warnings (notices and banners), current conditions (header and menu) | `conditions`, cron |
 | Nova Scotia Power outage map | Outage notices (2,000+ customers) | `conditions` |
 | Halifax Transit GTFS-realtime (gtfs.halifax.ca) | Transit map: vehicle positions and service alerts | `/api/transit/*`, fetched at most every 12 s (alerts 2 min) per Worker isolate |
-| Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `.github/workflows/transit.yml` checks each Monday, rebuilds with `scripts/build-transit.mjs` once a new schedule has started, and deploys; the cron warns the editor in the schedule's last week |
+| Halifax Transit GTFS schedule | Transit map: routes, lines, headsigns, stop names | `.github/workflows/transit.yml`, started weekly by the Worker's cron, rebuilds with `scripts/build-transit.mjs` once a new schedule has started, and deploys; the cron warns the editor in the schedule's last week |
 | Halifax Public Libraries events (BiblioCommons RSS) | Events tab, listed as posted | Fetched by the Events GitHub Action every 6 hours (about 16 requests) and posted to the Worker; the cron warns the editor when it's over 26 hours old |
 | Google Trends (Nova Scotia) | Signal: raises lead priority | `trending` |
 | r/halifax | Signal: something may be happening | `trending` |
@@ -126,7 +126,7 @@ keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and
 
 On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and `ADMIN_EMAILS` (optional, for Google sign-in, none set), `TURNSTILE_SECRET` (set Nov. 6),
-`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub).
+`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub), `GITHUB_ACTIONS_TOKEN` (fine-grained GitHub token for this repo with Actions read and write, so the cron can start the Events and Transit jobs; a refusal reaches the editor on Telegram).
 In `wrangler.jsonc` vars: `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` (public).
 GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.

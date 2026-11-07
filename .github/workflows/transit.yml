@@ -1,11 +1,11 @@
 # Keeps the Transit map's fixed data current. Checks Halifax Transit's GTFS schedule each week; when a new one has started,
 # rebuilds the data, runs the tests, commits it to main and starts a deploy (a push made with GITHUB_TOKEN doesn't start
 # one by itself). The Worker's cron warns the editor a week before the current schedule ends, in case this doesn't run.
+#
+# The Worker's cron starts this once a week (src/github-jobs.ts), because GitHub's own schedule isn't reliable here.
 name: Transit schedule
 
 on:
-  schedule:
-    - cron: "43 9 * * 1"   # Mondays, 5:43 a.m. Halifax time in winter
   workflow_dispatch:
 
 concurrency:

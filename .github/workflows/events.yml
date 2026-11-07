@@ -2,11 +2,11 @@
 # Cloudflare, so GitHub fetches it and posts the pages to the site (scripts/fetch-events.mjs).
 #
 # Needs one repository secret: EVENTS_TOKEN (set it, and the matching Worker secret, with node scripts/events-token.mjs)
+#
+# The Worker's cron starts this every 6 hours (src/github-jobs.ts), because GitHub's own schedule never ran it.
 name: Events
 
 on:
-  schedule:
-    - cron: "37 */6 * * *"
   workflow_dispatch:
 
 concurrency:

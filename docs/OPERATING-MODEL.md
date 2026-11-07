@@ -60,9 +60,9 @@ Defined in [`.claude/agents/`](../.claude/agents/). They help build and change t
  every 6h (:35)   Site reliability: health check                         → note only if broken
  19:00            Desk editor: evening briefing                          → note on Telegram
  Mondays 10:00    Source scout: proposals for new sources                → note on Telegram
- every 30 min     Worker cron: weather, weather warnings, events check, Developing → Articles, clean-up
- Mondays 05:43    GitHub Action: rebuild the Transit map if a new schedule has started, then deploy
- every 6h (:37)   GitHub Action: fetch library events and post them to the site
+ every 30 min     Worker cron: weather, weather warnings, events check, Developing → Articles, clean-up, starts the jobs below
+ every 7 days     GitHub Action, started by the cron: rebuild the Transit map if a new schedule has started, then deploy
+ every 6 hours    GitHub Action, started by the cron: fetch library events and post them to the site
 ```
 
 ## What reaches the editor on Telegram

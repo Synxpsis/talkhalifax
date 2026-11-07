@@ -12,6 +12,8 @@ export interface Env {
   NEWSROOM_TOKEN?: string;
   /** Bearer token the GitHub Action uses to post library events (scripts/events-token.mjs sets it). A secret. */
   EVENTS_TOKEN?: string;
+  /** GitHub token (fine-grained, this repo, Actions read and write) the cron uses to start the Events and Transit jobs. A secret. */
+  GITHUB_ACTIONS_TOKEN?: string;
   /** Telegram bot (@BotFather) that sends the editor new drafts to approve. A secret. */
   TELEGRAM_BOT_TOKEN?: string;
   /** The editor's Telegram chat id; the bot replies with it on /start. With the token set, new articles need approval. */

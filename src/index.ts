@@ -9,6 +9,7 @@ import { telegramWebhook, tellEditor } from "./telegram";
 import { checkTransitSchedule, transit } from "./transit";
 import { checkEvents, events, ingestEvents } from "./events";
 import { pushApi } from "./push";
+import { startGithubJobs } from "./github-jobs";
 export { ArticleRoom } from "./room";
 
 interface StoryRow {
@@ -289,7 +290,7 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env) {
-    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "transit schedule": async () => checkTransitSchedule(), "clean-up": tidyUp };
+    const jobs = { weather: refreshWeather, alerts: refreshAlerts, events: checkEvents, stages: evaluateStages, "transit schedule": async () => checkTransitSchedule(), "GitHub jobs": startGithubJobs, "clean-up": tidyUp };
     const results = await Promise.allSettled(Object.values(jobs).map(job => job(env)));
     await watchCron(env, Object.keys(jobs).map((name, i) => [name, results[i]] as const));
   },
