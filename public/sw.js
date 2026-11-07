@@ -1,9 +1,9 @@
 // TalkHalifax service worker: the app shell always opens, stories you've read stay readable offline, and push alerts
 // for urgent notices arrive here. Everything is network-first, so a deploy shows up on the next load; the caches are
 // only a fallback for when there's no connection.
-const VERSION = "th-v5";
+const VERSION = "th-v6";
 const SHELL = `${VERSION}-shell`, DATA = `${VERSION}-data`, FONTS = "th-fonts";
-const SHELL_FILES = ["/", "/app.js", "/events.js", "/alerts.js", "/transit.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/favicon-32.png"];
+const SHELL_FILES = ["/", "/app.js", "/events.js", "/alerts.js", "/transit.js", "/stats.js", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/favicon-32.png"];
 // Data worth keeping for offline reading; everything else under /api, /auth, /rooms and /mcp always goes to the network
 const KEEP = /^\/api\/(stories(\/[^/]+)?|weather|alerts|events|transit\/alerts)$/;
 const MAX_STORIES = 60;

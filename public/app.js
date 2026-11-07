@@ -860,7 +860,7 @@
     v.innerHTML = `<div class="profile">${back()}${loadingMsg()}</div>`;
     let who;
     try {
-      const r = await fetch("/auth/reset?token=" + encodeURIComponent(token));
+      const r = await fetch("/auth/reset/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "This reset link isn't working. Ask a moderator for a new one.");
       who = d.username;

@@ -41,10 +41,12 @@ Live at https://talkhalifax.ca (`talkhalifax.com` and `.org` redirect there). Th
 | Events | `src/events.ts`, `public/events.js` | The Events tab: Halifax Public Libraries' events for the next two weeks, stored in `feeds` ('events') and shown as the library lists them. The feed refuses Cloudflare, so a GitHub Action (`.github/workflows/events.yml`, started every 6 hours by the Worker's cron, `src/github-jobs.ts`) runs `scripts/fetch-events.mjs`, which posts the raw RSS pages to `POST /api/events/ingest` (Bearer `EVENTS_TOKEN`); the Worker parses and stores them |
 | Push alerts | `src/push.ts`, `public/alerts.js` | Readers opt in from the Alerts section of their profile, no account needed (kinds, quiet hours; `/#alerts` links land there). A new live notice offers the editor "Send alert" on Telegram; only that tap sends. Web Push with VAPID and aes128gcm, done with WebCrypto |
 | App shell | `public/sw.js`, `public/manifest.webmanifest`, `public/icons/` | Installable app; the service worker keeps the shell, stories you've read and the events list for offline reading, and shows push alerts |
+| Anonymous counts | `src/stats.ts`, `public/stats.js` | Open pages report to one `StatsHub` Durable Object about every 2 minutes (`POST /api/stats`, capped per IP address by the `STATS_LIMIT` rate limiter; reports over the cap are dropped). It writes totals to D1: each story's impressions and clicks per hour, every 10 minutes, and how many pages are open every 5 minutes. A page's random id stays in the hub's memory for at most about 6 minutes and never reaches D1 |
+| Admin site | `admin/` | A separate Worker at `admin.talkhalifax.ca` on the same D1 database, read-only for now: Home (what needs the editor, four charts over time), Users, Content (every screen, plus sources) and Administration (job health). Behind Cloudflare Access, and it checks Access's signed token itself, refusing everything until `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are set. It has no `workers.dev` address and never returns email addresses, password hashes, personas or Google ids |
 | Guidelines | `newsroom/guidelines.md` | How stories are written; bundled into the Worker and served by `get_guidelines` |
-| Schema | `migrations/0001`–`0011` | D1 tables (below) |
+| Schema | `migrations/0001`–`0013` | D1 tables (below) |
 | Tests | `test/unit/`, `test/e2e/routes.mjs` | `npm test`: the rules on the Workers runtime (screening, timing, approvals, bans, rate limits, events). `npm run test:e2e`: every page and story kind in a browser, with throwaway data |
-| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, unit tests and a browser check (any failure stops the deploy), D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails |
+| Deploy | `.github/workflows/deploy.yml` | Every push to `main`: type check, unit tests and a browser check (any failure stops the deploy), D1 migrations, `wrangler deploy`, a smoke test, and a rollback if it fails. Then the admin Worker, and a check that it refuses anyone who hasn't signed in |
 
 ## Content model
 
@@ -120,7 +122,7 @@ From a terminal or a cloud routine: `node scripts/newsroom.mjs tool <name> [json
 `users`, `sessions`, `auth_throttle` (rate limits, cleared after a day), `stories`, `story_versions`, `room_stats`,
 `message_index` (a copy of every chat message), `comments`, `feeds` (cached weather, weather warnings and library events, plus the cron's failure counts), `leads`,
 `pending_updates`, `reports`, `password_resets`, `push_subs` (one row per browser with alerts on: its push address,
-keys, kinds and quiet hours; not tied to an account). `stories.push_sent_at` and `push_count` record a sent alert. Live chat history itself lives in each room's Durable Object storage.
+keys, kinds and quiet hours; not tied to an account), `story_traffic` (each story's impressions and clicks per hour, kept 400 days), `online_samples` (pages open, every 5 minutes, kept 90 days). `stories.push_sent_at` and `push_count` record a sent alert. Live chat history itself lives in each room's Durable Object storage.
 
 ## Secrets and settings
 
@@ -128,6 +130,7 @@ On the Worker (`npx wrangler secret put <NAME>`): `NEWSROOM_TOKEN`, `TELEGRAM_BO
 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and `ADMIN_EMAILS` (optional, for Google sign-in, none set), `TURNSTILE_SECRET` (set Nov. 6),
 `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (push alerts; `node scripts/vapid-keys.mjs`, set Nov. 5), `EVENTS_TOKEN` (library events from GitHub; `node scripts/events-token.mjs` sets it here and on GitHub), `GITHUB_ACTIONS_TOKEN` (fine-grained GitHub token for this repo with Actions read and write, so the cron can start the Events and Transit jobs; a refusal reaches the editor on Telegram).
 In `wrangler.jsonc` vars: `ADMIN_USERNAMES`, and `TURNSTILE_SITE_KEY` (public).
+On the admin Worker (`--config admin/wrangler.jsonc`): `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`. It refuses everything until both are set.
 GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
 

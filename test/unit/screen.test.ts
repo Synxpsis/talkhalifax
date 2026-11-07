@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Env } from "../../src/env";
 import { screen } from "../../src/screen";
 import { DAY, env } from "./helpers";
@@ -25,6 +25,13 @@ describe("fixed rules", () => {
 });
 
 describe("Llama Guard", () => {
+  it("never writes the refused text to the logs", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await screen(withAI(async () => ({ response: "unsafe\nS10" })), "some private words", old);
+    expect(log).toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private");
+    log.mockRestore();
+  });
   it("blocks the categories we block, in either answer format", async () => {
     expect(await screen(withAI(async () => ({ response: "unsafe\nS10" })), "words", old)).toMatch(/hate/);
     expect(await screen(withAI(async () => ({ response: { safe: false, categories: ["S1"] } })), "words", old)).toMatch(/threats/);

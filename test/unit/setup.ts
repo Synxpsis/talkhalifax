@@ -7,7 +7,7 @@ await applyD1Migrations(e.DB, e.TEST_MIGRATIONS);
 
 // Every test starts from an empty newsroom
 beforeEach(async () => {
-  for (const t of ["pending_updates", "story_versions", "room_stats", "reports", "comments", "message_index", "sessions", "auth_throttle", "stories", "users", "feeds"])
+  for (const t of ["pending_updates", "story_versions", "room_stats", "reports", "comments", "message_index", "sessions", "auth_throttle", "stories", "users", "feeds", "story_traffic", "online_samples"])
     await e.DB.prepare(`DELETE FROM ${t}`).run();
 });
 afterEach(() => { vi.unstubAllGlobals(); });

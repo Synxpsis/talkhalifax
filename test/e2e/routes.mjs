@@ -3,12 +3,13 @@
 //   npm run test:e2e
 // Uses Chrome or Edge from the system, or the one at CHROME_PATH.
 import { execSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 
 const PORT = 8791, B = `http://localhost:${PORT}`;
+const ADMIN_PORT = 8792, ADMIN = `http://localhost:${ADMIN_PORT}`;
 const DATA = ".wrangler/e2e";
 const WRANGLER = ["wrangler", "--config", "test/wrangler.test.jsonc"];
 const win = process.platform === "win32";
@@ -54,8 +55,10 @@ writeFileSync(`${DATA}/seed.sql`, `${SEED} ${SEED_WATER} ${SEED_LAYOUT} ${SEED_W
 npx([...WRANGLER, "d1", "execute", "talkhalifax-test", "--local", "--persist-to", DATA, "--file", `${DATA}/seed.sql`]);
 
 const server = spawn("npx", [...WRANGLER, "dev", "--port", String(PORT), "--persist-to", DATA], { stdio: "ignore", shell: win, detached: !win, env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
-const stopServer = () => {
-  try { if (win) execSync(`taskkill /pid ${server.pid} /T /F`, { stdio: "ignore" }); else process.kill(-server.pid); } catch { /* already gone */ }
+let adminServer;
+const stopServer = (s = server) => {
+  if (!s) return;
+  try { if (win) execSync(`taskkill /pid ${s.pid} /T /F`, { stdio: "ignore" }); else process.kill(-s.pid); } catch { /* already gone */ }
 };
 
 let browser;
@@ -189,9 +192,110 @@ try {
   }
 
   ok(!errors.length, "no script errors", errors.slice(0, 5).join("; "));
+
+  // An open page reports its anonymous counts
+  {
+    const p = await browser.newPage();
+    const report = p.waitForResponse(r => r.url().endsWith("/api/stats"), { timeout: 8000 }).catch(() => null);
+    await p.goto(`${B}/#home`, { waitUntil: "load" });
+    const r = await report;
+    ok(r?.status() === 204, "an open page reports its anonymous counts", r ? `HTTP ${r.status()}` : "no report");
+    const stored = await p.evaluate(() => JSON.stringify({ ...localStorage }) + document.cookie);
+    ok(!/[a-f0-9]{24}/.test(stored), "the counting id isn't saved in the browser");
+    await p.close();
+  }
+
+  // A reset link checks its token without putting it in a URL
+  {
+    const p = await browser.newPage();
+    const urls = [];
+    p.on("request", r => urls.push(r.url().split("#")[0])); // The part after # is never sent to the server
+    await p.goto(`${B}/#reset-e2e-bad-token`, { waitUntil: "load" });
+    await p.waitForFunction(() => /expired or was already used/.test(document.querySelector("#reset")?.innerText || ""), { timeout: 8000 }).catch(() => {});
+    ok(/expired or was already used/.test(await p.evaluate(() => document.querySelector("#reset")?.innerText || "")), "a bad reset link says so");
+    ok(!urls.some(u => u.includes("e2e-bad-token")), "a reset token never appears in a request's URL");
+    await p.close();
+  }
+
+  // The admin site's real config keeps it off every other address, and can't skip the sign-in check
+  const adminConfig = readFileSync("admin/wrangler.jsonc", "utf8");
+  ok(/"workers_dev":\s*false/.test(adminConfig), "admin config: no workers.dev address");
+  ok(/"preview_urls":\s*false/.test(adminConfig), "admin config: no preview addresses");
+  ok(/"run_worker_first":\s*true/.test(adminConfig), "admin config: pages go through the sign-in check");
+  ok(!adminConfig.includes("ADMIN_DEV"), "admin config: doesn't set the local bypass");
+
+  // The admin site, on the same throwaway data
+  adminServer = spawn("npx", ["wrangler", "--config", "test/wrangler.admin.jsonc", "dev", "--port", String(ADMIN_PORT), "--persist-to", DATA, "--inspector-port", "9331"], { stdio: "ignore", shell: win, detached: !win, env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
+  for (let i = 0; ; i++) {
+    if (await fetch(ADMIN + "/api/summary").then(r => r.ok, () => false)) break;
+    if (i > 60) throw new Error("The local admin Worker didn't start.");
+    await wait(1000);
+  }
+  const adminErrors = [];
+  for (const [width, height, label] of [[1280, 900, "desktop"], [375, 812, "phone"]]) {
+    const open = async hash => {
+      const p = await browser.newPage();
+      p.on("pageerror", e => adminErrors.push(`${label} #${hash}: ${e.message}`));
+      p.on("console", m => { if (m.type() === "error" && !/fonts\.g|ERR_NAME|ERR_INTERNET/.test(m.text() + (m.location().url || ""))) adminErrors.push(`${label} #${hash}: ${m.text()}`); });
+      await p.setViewport({ width, height });
+      await p.goto(`${ADMIN}/#${hash}`, { waitUntil: "load" });
+      return p;
+    };
+    const fits = p => p.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+    const h1 = p => p.evaluate(() => document.querySelector("h1")?.innerText || "");
+
+    let p = await open("home");
+    await p.waitForSelector("#charts .plot", { timeout: 8000 }).catch(() => {});
+    ok(await h1(p) === "Home", `admin ${label}: Home opens`);
+    ok(await p.$$eval("#charts > .card", c => c.length) === 4, `admin ${label}: Home has the four chart cards`);
+    ok(await p.$$eval("#charts .plot", c => c.length) === 5, `admin ${label}: with a plot for each measure`);
+    ok(await fits(p), `admin ${label}: Home fits the screen`);
+    await p.click('[data-range="30d"]');
+    await p.waitForFunction(() => document.querySelector('[data-range="30d"]').classList.contains("on"), { timeout: 5000 }).catch(() => {});
+    ok(await p.$$eval("#charts .plot:first-child .col, #charts .plot .col", c => c.length) >= 30, `admin ${label}: the range switch redraws the charts`);
+    await p.click("[data-table=signups]");
+    ok(await p.$$eval("#charts .chart-table", c => c.length) === 1, `admin ${label}: a chart can show as a table`);
+    await p.close();
+
+    // Switching pages quickly shows the last one asked for, whichever answer arrives first
+    p = await open("home");
+    await p.evaluate(() => { location.hash = "#jobs"; location.hash = "#users"; location.hash = "#content-data"; location.hash = "#jobs"; });
+    await p.waitForFunction(() => document.querySelector("h1")?.innerText === "Administration", { timeout: 5000 }).catch(() => {});
+    await wait(1000);
+    ok(await h1(p) === "Administration", `admin ${label}: switching quickly lands on the last page`, await h1(p));
+    await p.close();
+
+    p = await open("users");
+    await p.waitForSelector("#urows", { timeout: 5000 }).catch(() => {});
+    ok(await h1(p) === "Users", `admin ${label}: Users opens`);
+    ok(await fits(p), `admin ${label}: Users fits the screen`);
+    await p.close();
+
+    p = await open("content");
+    await p.waitForFunction(() => document.querySelector("#crows")?.innerText.includes("A story still developing"), { timeout: 5000 }).catch(() => {});
+    ok((await p.evaluate(() => document.querySelector("#crows")?.innerText || "")).includes("A story still developing"), `admin ${label}: Content lists the stories`);
+    ok(await fits(p), `admin ${label}: Content fits the screen`);
+    await p.click('[data-screen="Notices"]');
+    await p.waitForFunction(() => !document.querySelector("#crows")?.innerText.includes("A story still developing"), { timeout: 5000 }).catch(() => {});
+    ok((await p.evaluate(() => document.querySelector("#crows")?.innerText || "")).includes("A notice about a road"), `admin ${label}: Content filters by screen`);
+    await p.close();
+
+    p = await open("content-data");
+    await p.waitForFunction(() => document.querySelector("h1")?.innerText === "Content", { timeout: 5000 }).catch(() => {});
+    ok(await fits(p), `admin ${label}: Data fits the screen`);
+    await p.close();
+
+    p = await open("jobs");
+    await p.waitForFunction(() => document.querySelector("h1")?.innerText === "Administration", { timeout: 5000 }).catch(() => {});
+    ok(await h1(p) === "Administration", `admin ${label}: Administration opens`);
+    ok(await fits(p), `admin ${label}: Administration fits the screen`);
+    await p.close();
+  }
+  ok(!adminErrors.length, "admin: no script errors", adminErrors.slice(0, 5).join("; "));
 } finally {
   await browser?.close().catch(() => {});
   stopServer();
+  stopServer(adminServer);
 }
 console.log(fails ? `\n${fails} failed` : "\nAll passed");
 process.exit(fails ? 1 : 0);

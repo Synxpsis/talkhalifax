@@ -15,6 +15,7 @@ One human and a set of agents. Agents do the watching, writing, checking and rep
   "Send alert" and "No alert" buttons. Nothing is pushed without that tap.
 - Handles reports, bans and reset links on the site.
 - Reads two briefings a day. Changes the guidelines and the agents' jobs.
+- Can see members, content, charts and job health on the admin site (`admin.talkhalifax.ca`). It's read-only for now, so approvals stay on Telegram and moderation stays on the site.
 - Approves every push to `main` (each one deploys).
 
 ### Newsroom agents (cloud routines, autonomous)

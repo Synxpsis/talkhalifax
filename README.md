@@ -12,6 +12,8 @@ Halifax news, rewritten as short articles with a live chat in each one. Runs on 
 - `src/push.ts`, `public/alerts.js` and `public/sw.js`: push alerts for urgent notices (sent only when the editor taps "Send alert" on Telegram), and the service worker that also keeps the app readable offline. `public/manifest.webmanifest` and `public/icons/` make it installable
 - `src/room.ts`: `ArticleRoom`, one Durable Object per story, holding its chat history, presence and typing
 - `src/auth.ts`: sessions (HttpOnly cookie), Google sign-in, and a localhost-only dev sign-in
+- `src/stats.ts` and `public/stats.js`: anonymous counts of who has the site open and which stories are shown and opened, for the admin site's charts
+- `admin/`: the admin site, a separate read-only Worker on the same database, behind Cloudflare Access (see below)
 - `migrations/`: the D1 schema. `scripts/articles/` plus `scripts/build-seed.mjs` load the current stories.
 
 ## Run locally
@@ -53,6 +55,27 @@ Secrets live on the Worker, not in the repo:
 - `GITHUB_ACTIONS_TOKEN`: lets the Worker's cron start the Events and Transit jobs. A fine-grained GitHub token for this repository with Actions read and write
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: push alerts stay off without them. Make and store both with `node scripts/vapid-keys.mjs` (run it once: a new pair turns everyone's alerts off). For a local run, pass test keys with `--var`
 
+## The admin site
+
+`admin.talkhalifax.ca`: Home, Users, Content and Administration, on a separate Worker (`admin/`) that shares the site's D1 database. Stage 1 is read-only. Every push to `main` deploys it after the main site. It has no `workers.dev` address, and it refuses every request until Access is set up.
+
+To set it up, once, in the Cloudflare dashboard:
+1. **Zero Trust › Access › Applications › Add an application › Self-hosted.** Set the domain to `admin.talkhalifax.ca` and add a policy that allows only your own login. Copy the application's **AUD tag**, and note your team domain (`yourteam.cloudflareaccess.com`).
+2. Store both on the admin Worker:
+   ```bash
+   npx wrangler secret put ACCESS_TEAM_DOMAIN --config admin/wrangler.jsonc
+   npx wrangler secret put ACCESS_AUD --config admin/wrangler.jsonc
+   ```
+3. **Workers & Pages › talkhalifax-admin › Settings › Domains & Routes:** add the custom domain `admin.talkhalifax.ca`.
+
+To run it locally against your local data:
+```bash
+npx wrangler dev --config admin/wrangler.jsonc --port 8790 --persist-to .wrangler/state --var ADMIN_DEV:1
+```
+`ADMIN_DEV` only skips the Access check on localhost. Never set it on the real Worker.
+
+## Moderators
+
 Moderators: `ADMIN_USERNAMES` in `wrangler.jsonc`. If Google sign-in is turned on, also `npx wrangler secret put ADMIN_EMAILS` (comma-separated; a secret because this repo is public).
 
 ## Moderation
@@ -61,7 +84,7 @@ Moderators: `ADMIN_USERNAMES` in `wrangler.jsonc`. If Google sign-in is turned o
 - **Reports.** Signed-in readers flag a message (⚑) or comment (Report). Moderators see open reports on their profile and remove the item or dismiss the report; the editor gets a Telegram note on each item's first report.
 - **Bans.** From someone's profile a moderator can ban them from posting (it applies to their next message, even in an open chat), or ban them and remove everything they posted. Moderators and the journalist can't be banned.
 - **Password reset.** Password accounts have no email, so a moderator makes a one-time reset link from the person's profile (valid 1 hour) and sends it to them. Anyone signed in can change their password or delete their account from their profile.
-- **Privacy.** The notice is at `/#privacy`. The cron trigger deletes rate-limit counters (some keyed by IP address) after a day, and expired sessions and reset links.
+- **Privacy.** The notice is at `/#privacy`. The cron trigger deletes rate-limit counters (some keyed by IP address) after a day, and expired sessions and reset links. Separately, Workers Logs (`observability` in `wrangler.jsonc`) records each request, including its IP address and approximate location and, for a signed-in reader joining a chat, their account ID, for up to 7 days. Change the notice if either changes.
 
 ## Publishing stories
 

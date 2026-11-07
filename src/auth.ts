@@ -338,8 +338,11 @@ export async function handleAuth(req: Request, env: Env, url: URL): Promise<Resp
     if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 403 });
     return changePassword(req, env);
   }
-  if (path === "/auth/reset" && req.method === "GET") {
-    const r = await resetInfo(env, url.searchParams.get("token") || "");
+  // A POST so the token never sits in a URL, where the request logs would keep it beside the IP address
+  if (path === "/auth/reset/check" && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 403 });
+    const body = await req.json<{ token?: unknown }>().catch(() => ({} as { token?: unknown }));
+    const r = await resetInfo(env, String(body.token ?? ""));
     return r ? json({ username: r.username }) : json({ error: RESET_GONE }, { status: 410 });
   }
   if (path === "/auth/reset" && req.method === "POST") {

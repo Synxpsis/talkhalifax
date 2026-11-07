@@ -10,7 +10,9 @@ import { checkTransitSchedule, transit } from "./transit";
 import { checkEvents, events, ingestEvents } from "./events";
 import { pushApi } from "./push";
 import { startGithubJobs } from "./github-jobs";
+import { statsReport } from "./stats";
 export { ArticleRoom } from "./room";
+export { StatsHub } from "./stats";
 
 interface StoryRow {
   id: string; kind: string; status: string; section: string; area: string; headline: string; dek: string;
@@ -154,6 +156,12 @@ async function api(req: Request, env: Env, url: URL, ctx: ExecutionContext): Pro
     return token ? json({ url: `${url.origin}/#reset-${token}`, expiresIn: "1 hour" }) : json({ error: "Only accounts with a password can be reset." }, { status: 400 });
   }
 
+  // Anonymous counts for the admin site, from open pages
+  if (path === "/api/stats" && req.method === "POST") {
+    if (!sameOrigin(req, url)) return json({ error: "Bad request" }, { status: 400 });
+    return statsReport(req, env);
+  }
+
   if (path === "/api/weather") return json({ weather: await getWeather(env, ctx) });
   if (path === "/api/alerts") return json({ alerts: await getAlerts(env, ctx) });
   if (path.startsWith("/api/transit/")) return transit(path);
@@ -223,13 +231,15 @@ async function room(req: Request, env: Env, id: string): Promise<Response> {
   return stub.fetch(new Request(`https://room/${encodeURIComponent(id)}`, { headers }));
 }
 
-/** Forget what's no longer needed: rate-limit counters (some are keyed by IP address), expired sessions and reset links. */
+/** Forget what's no longer needed: rate-limit counters (some are keyed by IP address), expired sessions and reset links, old anonymous counts. */
 async function tidyUp(env: Env) {
   const now = Date.now();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM auth_throttle WHERE window_start < ?").bind(now - 864e5),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
     env.DB.prepare("DELETE FROM password_resets WHERE expires_at < ?").bind(now),
+    env.DB.prepare("DELETE FROM online_samples WHERE at < ?").bind(now - 90 * 864e5),
+    env.DB.prepare("DELETE FROM story_traffic WHERE hour < ?").bind(Math.floor((now - 400 * 864e5) / 36e5)),
   ]);
 }
 

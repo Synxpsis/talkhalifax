@@ -18,8 +18,12 @@
   ],
 
   // One ArticleRoom per story: live chat history, connections, presence and typing.
-  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }],
+  // StatsHub: one, for the anonymous counts behind the admin site's charts.
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }, { "name": "STATS", "class_name": "StatsHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }, { "tag": "v2", "new_sqlite_classes": ["StatsHub"] }],
+
+  // Caps anonymous count reports per IP address. High enough for a building full of readers on one connection.
+  "ratelimits": [{ "name": "STATS_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
 
   // Workers AI screens chat messages and comments (Llama Guard) before they post.
   "ai": { "binding": "AI" },

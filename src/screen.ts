@@ -38,7 +38,7 @@ export async function screen(env: Env, text: string, author: { created_at: numbe
     // "Non-violent crime" aimed at someone ("I'll burn your house down") is a threat; about the news, it's fine
     const hit = found.find(c => BLOCK[c]) || (found.includes("S2") && AIMED.test(text) ? "S1" : undefined);
     if (hit) {
-      console.log("screened", hit, text.slice(0, 80));
+      console.log("screened", hit); // Never the text: logs outlive deleting a message or an account
       return `That wasn't posted: it looks like ${BLOCK[hit]}, which breaks the chat rules.`;
     }
   } catch (e) {

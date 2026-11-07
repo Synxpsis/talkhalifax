@@ -663,15 +663,17 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
   <section class="view wrap legal" id="privacy" hidden>
     <button type="button" class="back" data-go="home">← Home</button>
     <div class="forum-top"><h1>Privacy</h1></div>
-    <p>TalkHalifax keeps as little about you as it can. This is everything, in plain words.</p>
+    <p>TalkHalifax tries to keep little about you. This is everything, in plain words.</p>
 
     <h2>What we keep</h2>
     <ul>
       <li><b>Your account.</b> Your username and a scrambled (hashed) copy of your password. If you sign in with Google instead, your name, email address and profile photo from Google.</li>
       <li><b>What you post.</b> Your chat messages and comments, and any reports you make.</li>
-      <li><b>One cookie</b> that keeps you signed in for 30 days. There are no advertising or tracking cookies, and no analytics.</li>
-      <li><b>Your connection's IP address</b>, briefly, to slow down mass sign-ups and password guessing. It's deleted within a day.</li>
-      <li><b>If you turn on alerts</b>, your browser's alert address (a link to its push service, such as Google's, Apple's or Mozilla's), the keys that let us encrypt alerts to it, and the kinds of alert and quiet hours you picked. Nothing ties these to your name or account.</li>
+      <li><b>One cookie</b> that keeps you signed in for 30 days. There are no advertising or tracking cookies, and no outside analytics services.</li>
+      <li><b>Anonymous counts.</b> We count how many people have the site open, and how often each story is shown in a list and opened. Your browser sends a random number made when the page loads, so one page isn't counted twice. It isn't saved in your browser or tied to you or your account, and it's forgotten within about 10 minutes. Only totals are kept from these counts: per story for up to 400 days, and for people online up to 90 days.</li>
+      <li><b>Your connection's IP address.</b> We use it to slow down mass sign-ups, guessing at password reset links and repeated changes to alert settings, in counters that are deleted after about a day. Sign-up also sends it to Cloudflare's bot check. We also use it to limit how many anonymous counts one connection can send, in a short-lived counter at Cloudflare that we don't store.</li>
+      <li><b>Request logs.</b> Separately, we've turned on Cloudflare's request logs. They record each request to the site, including the address asked for, your IP address, your browser type and language, and your approximate location worked out from the IP address, such as your city, postal code and map coordinates. The address can show which stories you opened or that you changed your alerts. If you're signed in and join a story's chat, the logs connect your account ID to that chat, your IP address and your location, so they aren't anonymous. They don't record what you post, your password or your session cookie. They're kept for up to 7 days, for security and to fix problems.</li>
+      <li><b>If you turn on alerts</b>, your browser's alert address (a link to its push service, such as Google's, Apple's or Mozilla's), the keys that let us encrypt alerts to it, and the kinds of alert and quiet hours you picked. Nothing stored with them ties them to your name or account, though the request logs show alert changes beside your IP address.</li>
       <li>Settings, like whether the chat starts open or your event filters, stay in your own browser. So do the stories you've opened, kept for offline reading.</li>
     </ul>
 
@@ -679,9 +681,11 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
     <ul>
       <li>Your name, photo and what you post are public: on the story, and on your profile.</li>
       <li>Moderators see reports, including the text that was reported.</li>
+      <li>The editor can see a list of members on a private admin page: name, username, role, whether they're banned, when they joined, how many messages they've posted and when they last posted, and how many open reports are against them. It doesn't show email addresses or passwords.</li>
+      <li>The editor can read the request logs, and so can tools the editor gives access to our Cloudflare account, including AI assistants used to run and check the site.</li>
       <li>Messages and comments are checked before they appear, by fixed rules and by an AI model that Cloudflare runs, to keep out slurs, threats, hate and personal details.</li>
       <li>The newsroom's AI journalist (Claude, made by Anthropic) can read recent chat messages to decide what to look into. It never quotes them or treats them as facts.</li>
-      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database and runs the sign-up bot check; Google handles Google sign-in; Telegram carries notes about reported posts to the editor. The Transit map loads its map library from unpkg and its map tiles from OpenFreeMap, which see your IP address like any website you visit; your location is used only if you tap the locate button, and only in your browser. The Events tab lists events from Halifax Public Libraries; its links take you to the library's site. Alerts travel through your browser's own push service, which sees the encrypted alert but can't read it.</li>
+      <li>Services that run TalkHalifax handle data for us: Cloudflare hosts the site and its database, keeps the request logs and runs the sign-up bot check, which sees your IP address; Google handles Google sign-in; Telegram carries notes about reported posts to the editor. The Transit map loads its map library from unpkg and its map tiles from OpenFreeMap, which see your IP address like any website you visit; your location is used only if you tap the locate button, and only in your browser. The Events tab lists events from Halifax Public Libraries; its links take you to the library's site. Alerts travel through your browser's own push service, which sees the encrypted alert but can't read it.</li>
       <li>We don't sell your data or share it with anyone else.</li>
     </ul>
 
@@ -693,9 +697,9 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
       <li>Delete any of your messages or comments yourself, at any time.</li>
       <li>Change your password from your profile. If you're locked out, a moderator can send you a one-time reset link.</li>
       <li>Turn alerts off in the Alerts section of your profile (no account needed) and your alert address is deleted at once. Blocking notifications in your browser stops them too; the address is deleted the next time an alert can't be delivered.</li>
-      <li>Delete your account from your profile. Your messages and comments are erased, your account is emptied, and you're signed out everywhere.</li>
+      <li>Delete your account from your profile. Your messages and comments are erased, your account is emptied, and you're signed out everywhere. Request logs aren't changed by this; they age out within 7 days.</li>
     </ul>
-    <p class="forum-foot">Last updated November 5, 2026.</p>
+    <p class="forum-foot">Last updated November 7, 2026.</p>
   </section>
 
 </main>
@@ -750,5 +754,6 @@ header .wx:not([hidden]) + .hnav { margin-left: 0; }
 </footer>
 
 <script src="/app.js"></script>
+<script src="/stats.js" defer></script>
 </body>
 </html>

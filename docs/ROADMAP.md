@@ -68,6 +68,13 @@ features land on a codebase that can take them.
 - A styleguide page that shows every component in both themes.
 - An accessibility pass (contrast, focus order, screen reader labels on chat).
 
+**6e. Admin site** (`admin/`, editor's decision, Nov. 6)
+A separate Worker behind Cloudflare Access, on the same database, organized as Users, Content and Administration.
+- ✅ Stage 1, read-only: Home with charts over time, the member list, all content across screens, sources and job health, plus anonymous counts on the public site for people online, clicks and impressions.
+- Stage 2, Users and moderation: reports, bans, reset links, role changes, a new Admin role, a live chat feed across rooms and an action log. Do chat retention (**D1**) and the restore plan (**D2**) first, since this is when it starts changing real data. Move roles out of `ADMIN_USERNAMES`, which restores moderator at each sign-in.
+- Stage 3, live controls: feature switches, a site banner and announcements to all chat rooms. If settings can't load, everything stays on.
+- Stage 4, editing and SEO: manual story edits through version history, then real story URLs (stories are `/#article-…` today, which search engines don't treat as pages), then SEO fields.
+
 **Exit test:** installed on a phone, the site opens with no network and shows yesterday's stories; a test P0 notice,
 once approved, reaches an opted-in phone within a minute; Lighthouse PWA and accessibility checks pass.
 
@@ -94,7 +101,7 @@ Only once the site is good on its own. Every post links back to the story and it
 - Automatic posts for approved P0 notices on one platform first (Bluesky or Mastodon, both have open APIs), then others.
 - A daily digest of the top stories, by email or a social thread, written by the desk editor and approved like a story.
 - A social editor agent in the operating model, with its own audit by the standards editor.
-- Simple counts: where readers came from and which notices they opened (no third-party trackers).
+- Simple counts: where readers came from (no third-party trackers). Stories shown and opened are already counted for the admin site.
 
 **Exit test:** a P0 notice is on the site and on social within the hour, with identical facts, and the editor's time on
 Telegram hasn't gone up.

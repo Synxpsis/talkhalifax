@@ -102,6 +102,7 @@ text sizes must already be readable: 16px body minimum on inputs to stop iOS zoo
 | Forms | `.auth-form`, `.auth-err` (`.ok`), `.ts-box` | Sign-in, sign-up with Turnstile, reset |
 | Moderation | `.report`, `.mod-tools`, `.rep-done`, `.reset-link` | Moderators only |
 | Legal | `.legal` | Privacy page reading width |
+| Admin site | `admin/public/admin.css` | Its own small stylesheet on the same tokens: side menu that stacks on phones, glass cards, wide lists that scroll inside their card. Charts use `--ink` only, one measure per plot with a shared zero baseline; hover shows the exact value and every chart can show as a table |
 
 ## Voice in the interface
 

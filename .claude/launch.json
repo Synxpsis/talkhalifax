@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "--config", "admin/wrangler.jsonc", "--port", "8790", "--inspector-port", "9332", "--persist-to", ".wrangler/state", "--var", "ADMIN_DEV:1"],
+      "port": 8790
+    }
+  ]
+}

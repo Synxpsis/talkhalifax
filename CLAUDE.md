@@ -27,6 +27,10 @@ standards-keeper, docs-keeper).
   and `npx wrangler dev`, and exercise the change. Never test with accounts or posts on the live site.
 - Commit messages end with the Co-Authored-By line given in the session.
 
+## Admin site
+
+`admin/` is a separate Worker on the same D1 database, behind Cloudflare Access. Migrations stay in `migrations/`, and it must keep refusing every request when Access isn't configured. See [README.md](README.md).
+
 ## Line endings
 
 Every file is LF, enforced by `.gitattributes` (`* text=auto eol=lf`). Python on Windows writes CRLF in text mode

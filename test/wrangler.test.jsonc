@@ -10,7 +10,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "talkhalifax-test", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "../migrations" }
   ],
-  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }],
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "ArticleRoom" }, { "name": "STATS", "class_name": "StatsHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArticleRoom"] }, { "tag": "v2", "new_sqlite_classes": ["StatsHub"] }],
+  "ratelimits": [{ "name": "STATS_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
   "vars": { "ADMIN_USERNAMES": "admin" }
 }

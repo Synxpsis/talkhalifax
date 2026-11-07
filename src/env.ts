@@ -1,6 +1,10 @@
 export interface Env {
   DB: D1Database;
   ROOMS: DurableObjectNamespace;
+  /** One StatsHub: anonymous counts of who has the site open and which stories are shown and opened. */
+  STATS: DurableObjectNamespace;
+  /** Caps anonymous count reports per IP address. If it's missing, reports aren't capped. */
+  STATS_LIMIT?: { limit(o: { key: string }): Promise<{ success: boolean }> };
   ASSETS: Fetcher;
   /** Comma-separated Google emails that get the moderator role. A secret, because the repo is public. */
   ADMIN_EMAILS?: string;

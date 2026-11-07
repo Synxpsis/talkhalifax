@@ -1,0 +1,21 @@
+// The admin site: a separate Worker on the same database, reached only through Cloudflare Access.
+// Its address (admin.talkhalifax.ca) is a custom domain set in the dashboard, like the main site's.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "talkhalifax-admin",
+  "account_id": "5b365e1eb102c26b07e110dae02fbfa9",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+
+  // No workers.dev or preview address: either one would be a way in that doesn't go through the Access login page.
+  "workers_dev": false,
+  "preview_urls": false,
+
+  // The Worker runs first so the page itself is behind the sign-in check too.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
+
+  "d1_databases": [
+    { "binding": "DB", "database_name": "talkhalifax", "database_id": "11e74fb3-39eb-42ac-9f0b-620d5c3d47d2" }
+  ],
+  "observability": { "enabled": true }
+}

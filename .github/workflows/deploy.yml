@@ -35,7 +35,7 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
       - name: Client script parses
-        run: node --check public/app.js
+        run: node --check public/app.js && node --check public/stats.js && node --check admin/public/admin.js
       - name: Type check the tests
         run: npx tsc -p test
       - name: Unit tests
@@ -82,3 +82,14 @@ jobs:
       - name: Roll back
         if: failure() && steps.smoke.outcome == 'failure'
         run: npx wrangler rollback --yes --message "Smoke test failed for ${GITHUB_SHA::7}"
+      # The admin site, once the main site is known to be fine. A problem here turns the run red but leaves the main site alone.
+      - name: Deploy the admin site
+        run: npx wrangler deploy --config admin/wrangler.jsonc
+      # A 200 without signing in would mean the admin site is open to anyone. No answer is fine until its address is set up.
+      - name: Check the admin site refuses strangers
+        run: |
+          for path in / /admin.js /api/users; do
+            code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "https://admin.talkhalifax.ca$path" || true)
+            echo "admin.talkhalifax.ca$path answered HTTP $code"
+            if [ "$code" = "200" ]; then echo "::error::The admin site answered $path without a sign-in. Check its Cloudflare Access application."; exit 1; fi
+          done
