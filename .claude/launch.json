@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "--port", "8787", "--inspector-port", "9333", "--persist-to", ".wrangler/state", "--var", "TURNSTILE_SITE_KEY:1x00000000000000000000AA", "--var", "TURNSTILE_SECRET:1x0000000000000000000000000000000AA"],
+      "port": 8787
+    },
+    {
       "name": "admin",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["wrangler", "dev", "--config", "admin/wrangler.jsonc", "--port", "8790", "--inspector-port", "9332", "--persist-to", ".wrangler/state", "--var", "ADMIN_DEV:1"],

@@ -278,25 +278,60 @@ function redirectToSite(req: Request, url: URL) {
   return null;
 }
 
+async function route(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(req.url);
+  const moved = redirectToSite(req, url);
+  if (moved) return moved;
+  try {
+    if (url.pathname.startsWith("/auth/")) return (await handleAuth(req, env, url)) ?? new Response("Not found", { status: 404 });
+    if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);
+    // The newsroom's MCP server, for Claude agents
+    if (url.pathname === "/mcp") return await mcp(req, env);
+    // The editor approves drafts from Telegram
+    if (url.pathname.startsWith("/telegram/")) return await telegramWebhook(req, env, url);
+    const r = url.pathname.match(/^\/rooms\/([A-Za-z0-9_.~-]{1,200})\/ws$/);
+    if (r) return await room(req, env, r[1]);
+    return env.ASSETS.fetch(req);
+  } catch (e) {
+    console.error(e);
+    return json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+// Strict-Transport-Security isn't here because the zone already sends it. The Content-Security-Policy only reports for now:
+// turn it on once the editor has seen a few days with no real violations.
+const SECURITY_HEADERS: Record<string, string> = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "geolocation=(self), camera=(), microphone=()", // The Transit map's locate button needs geolocation
+  "content-security-policy-report-only": [
+    "default-src 'self'",
+    "script-src 'self' https://unpkg.com https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https://*.googleusercontent.com https://halifax.bibliocommons.com", // Google profile photos, library event photos
+    "connect-src 'self' https://tiles.openfreemap.org https://fonts.googleapis.com https://fonts.gstatic.com",
+    "worker-src 'self' blob:",
+    "frame-src https://challenges.cloudflare.com",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "),
+};
+
+/** The site's security headers on a response. A WebSocket upgrade passes untouched: live chat depends on it. */
+function secured(res: Response): Response {
+  if (res.status === 101) return res;
+  const out = new Response(res.body, res); // Asset and redirect responses can't be changed directly
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
+  return out;
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(req.url);
-    const moved = redirectToSite(req, url);
-    if (moved) return moved;
-    try {
-      if (url.pathname.startsWith("/auth/")) return (await handleAuth(req, env, url)) ?? new Response("Not found", { status: 404 });
-      if (url.pathname.startsWith("/api/")) return await api(req, env, url, ctx);
-      // The newsroom's MCP server, for Claude agents
-      if (url.pathname === "/mcp") return await mcp(req, env);
-      // The editor approves drafts from Telegram
-      if (url.pathname.startsWith("/telegram/")) return await telegramWebhook(req, env, url);
-      const r = url.pathname.match(/^\/rooms\/([A-Za-z0-9_.~-]{1,200})\/ws$/);
-      if (r) return await room(req, env, r[1]);
-      return env.ASSETS.fetch(req);
-    } catch (e) {
-      console.error(e);
-      return json({ error: "Something went wrong" }, { status: 500 });
-    }
+    return secured(await route(req, env, ctx));
   },
 
   async scheduled(_event: ScheduledController, env: Env) {

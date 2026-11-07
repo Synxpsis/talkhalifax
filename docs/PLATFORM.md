@@ -134,6 +134,16 @@ On the admin Worker (`--config admin/wrangler.jsonc`): `ACCESS_TEAM_DOMAIN`, `AC
 GitHub repository secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit, D1 Edit; it also covers the Workers AI binding) and `EVENTS_TOKEN` (the Events workflow).
 Cloud routines: environment variable `TALKHALIFAX_TOKEN` (the newsroom token) and network access to the site.
 
+## Web security settings
+
+**Set on the three Cloudflare zones** (`talkhalifax.ca`, `.com`, `.org`), in the dashboard rather than this repo: Always Use HTTPS, minimum TLS 1.2, HSTS (6 months, no subdomains, no preload), DMARC `p=reject` on all three, SPF `-all` on `.com` and `.org`, and DNSSEC turned on. Bot Fight Mode is deliberately off.
+
+**Set by the Worker** on every response except a chat's WebSocket upgrade (`secured()` in `src/index.ts`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy` (geolocation for the site itself, for the Transit map's locate button; no camera or microphone). HSTS isn't set here because the zone sends it.
+
+The Content Security Policy is **report-only for now**: it blocks nothing, and browsers only note what it would have blocked. Turn it on as a separate change once the editor has seen a few days with no real violations. It allows unpkg (MapLibre), OpenFreeMap (map styles and tiles), Turnstile, Google Fonts, Google profile photos and library event photos. Inline `style=` attributes are allowed because `public/app.js` uses many.
+
+**Request logs:** Workers Logs (`observability` in `wrangler.jsonc`) records each request's URL, IP address, browser details and approximate location, and for a signed-in reader joining a chat, their account ID (**D6**). The privacy notice describes this, so change it if the logging changes.
+
 ## Agents running now
 
 | Agent | Schedule | Routine |
